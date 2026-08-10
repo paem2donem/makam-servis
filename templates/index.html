@@ -16,7 +16,7 @@
     <div class="category-tabs" style="display: flex; gap: 6px; margin-bottom: 10px; justify-content: center; flex-wrap: wrap;">
         <button class="btn-category active" onclick="filterCategory('all', this)">🍱 Tüm Menü</button>
         <button class="btn-category" onclick="filterCategory('icecek', this)">☕ İçecekler</button>
-        <button class="btn-category" onclick="filterCategory('yemek', this)">🍽️ Yemekler</button>
+        <button class="btn-category" onclick="filterCategory('yemek', this)">🍽️ Yiyecekler</button>
     </div>
 
     <!-- İÇECEK SEKSİYONU (EN ÜSTTE) -->
@@ -49,10 +49,10 @@
         </div>
     </div>
 
-    <!-- YEMEK SEKSİYONU -->
+    <!-- YİYECEK SEKSİYONU -->
     <div id="section-yemek" class="menu-section" style="margin-top: 32px;">
         <h2 class="section-title" style="margin-bottom: 3px; color: #b45309; font-size: 0.9rem; display: flex; align-items: center; gap: 4px;">
-            🍽️ Yemekler
+            🍽️ Yiyecekler
         </h2>
         <div class="products-grid">
             {% for p in food_products %}
@@ -74,7 +74,7 @@
                 </div>
             </div>
             {% else %}
-            <p style="color: #6b7280; grid-column: 1/-1; font-size: 0.8rem;">Kayıtlı yemek bulunmuyor.</p>
+            <p style="color: #6b7280; grid-column: 1/-1; font-size: 0.8rem;">Kayıtlı yiyecek bulunmuyor.</p>
             {% endfor %}
         </div>
     </div>

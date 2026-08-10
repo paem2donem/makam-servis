@@ -81,7 +81,7 @@
                         <label class="form-label-custom">Kategori</label>
                         <select id="productCategory" name="category" class="form-input-custom">
                             <option value="icecek">☕ İçecek</option>
-                            <option value="yemek">🍽️ Yemek</option>
+                            <option value="yemek">🍽️ Yiyecek</option>
                         </select>
                     </div>
 
@@ -124,7 +124,7 @@
                             <span class="prod-title">{{ p.name }}</span>
                             <span
                                 class="prod-cat-pill {% if p.category == 'yemek' %}cat-yemek{% else %}cat-icecek{% endif %}">
-                                {% if p.category == 'yemek' %}🍽️ Yemek{% else %}☕ İçecek{% endif %}
+                                {% if p.category == 'yemek' %}🍽️ Yiyecek{% else %}☕ İçecek{% endif %}
                             </span>
                         </div>
                         <div class="prod-actions">
