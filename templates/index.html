@@ -86,7 +86,7 @@
                 <li class="empty-text">Sepetiniz boş.</li>
             </ul>
             <div id="orderControls" style="display: none;">
-                <textarea id="orderNotes" placeholder="Varsa notunuzu buraya yazın..." class="form-control"></textarea>
+                <textarea id="orderNotes" placeholder="Varsa notunuzu buraya yazın..." class="form-control" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); submitOrder(); }"></textarea>
                 <button id="btnSubmitOrder" class="btn-primary btn-block" onclick="submitOrder()">Siparişi Mutfağa Gönder</button>
             </div>
         </div>
