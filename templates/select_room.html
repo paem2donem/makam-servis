@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Oda Seçimi - Makam Servis{% endblock %}
+
+{% block content %}
+<div class="select-room-container">
+    <div class="glass-card room-select-card">
+        <div class="room-select-header">
+            <div class="select-logo-badge">🏛️</div>
+            <h1>Makam Servis</h1>
+            <p>Lütfen ikram siparişi vermek istediğiniz odayı seçin</p>
+        </div>
+
+        {% if error %}
+        <div class="error-alert">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <div class="room-buttons-grid">
+            {% for r in rooms %}
+            <a href="/{{ r.slug }}" class="btn-room-select">
+                <span class="room-select-icon">🚪</span>
+                <span class="room-select-name">{{ r.name }}</span>
+                <span class="room-select-arrow">→</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

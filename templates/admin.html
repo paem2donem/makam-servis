@@ -1,0 +1,493 @@
+{% extends "base.html" %}
+
+{% block title %}Yönetici Kontrol Paneli - Makam Servis{% endblock %}
+
+{% block content %}
+<!-- PREMIUN BANNER HEADER -->
+<header class="admin-banner-header">
+    <div class="admin-header-container">
+        <div class="admin-brand-info">
+            <div class="admin-avatar-icon">⚙️</div>
+            <div>
+                <h1 class="admin-header-title">Yönetici Kontrol Paneli</h1>
+                <p class="admin-header-sub">Makam Servis • Sistem & Mutfak Yönetim Merkezi</p>
+            </div>
+        </div>
+        <div class="admin-header-actions">
+            <span class="admin-status-badge">
+                <span class="pulse-dot"></span> Sistem Aktif
+            </span>
+            <a href="/logout" class="btn-admin-logout">
+                <span>Çıkış Yap</span> 🚪
+            </a>
+        </div>
+    </div>
+</header>
+
+<main class="container admin-main-container">
+    <!-- PREMIUN SEGMENTED TABS -->
+    <div class="segmented-tab-bar">
+        <button id="tabBtnKitchen" class="segment-btn active" onclick="switchAdminTab('kitchen')">
+            <span class="tab-icon">👨‍🍳</span>
+            <span class="tab-label">Mutfak Paneli</span>
+            <span id="activeOrdersCount" class="badge-count">0</span>
+        </button>
+        <button id="tabBtnProducts" class="segment-btn" onclick="switchAdminTab('products')">
+            <span class="tab-icon">☕</span>
+            <span class="tab-label">Menü & Ürünler</span>
+        </button>
+        <button id="tabBtnRooms" class="segment-btn" onclick="switchAdminTab('rooms')">
+            <span class="tab-icon">📱</span>
+            <span class="tab-label">Odalar & QR Kodlar</span>
+        </button>
+    </div>
+
+    <!-- TAB 1: MUTFAK SİPARİŞLERİ -->
+    <div id="adminTabKitchen" class="admin-tab-content">
+        <div class="section-card-header">
+            <div>
+                <h2 class="card-section-title">👨‍🍳 Mutfağa Gelen Aktif Siparişler</h2>
+                <p class="card-section-desc">Anlık olarak mutfağa düşen siparişleri buradan takip edip kapatabilirsiniz.
+                </p>
+            </div>
+            <a href="/mutfak" target="_blank" class="btn-outline-primary">
+                Tam Ekran Mutfak Paneli ↗
+            </a>
+        </div>
+
+        <div id="kitchenOrdersContainer" class="orders-grid">
+            <div class="loading-state">Siparişler yükleniyor...</div>
+        </div>
+    </div>
+
+    <!-- TAB 2: ÜRÜN & MENÜ YÖNETİMİ -->
+    <div id="adminTabProducts" class="admin-tab-content" style="display: none;">
+        <div class="admin-grid">
+            <!-- Ürün Ekleme / Düzenleme Formu -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <h2 id="formTitle" class="panel-title">✨ Yeni Ürün Ekle</h2>
+                </div>
+                <form id="productForm" onsubmit="handleFormSubmit(event)">
+                    <input type="hidden" id="editProductId" value="">
+
+                    <div class="form-group-custom">
+                        <label class="form-label-custom">Ürün Adı</label>
+                        <input type="text" id="productName" name="name" class="form-input-custom" required
+                            placeholder="Örn: Demli Çay">
+                    </div>
+
+                    <div class="form-group-custom">
+                        <label class="form-label-custom">Kategori</label>
+                        <select id="productCategory" name="category" class="form-input-custom">
+                            <option value="icecek">☕ İçecek</option>
+                            <option value="yemek">🍽️ Yemek</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group-custom">
+                        <label class="form-label-custom">Ürün Görseli <span class="label-optional">(İsteğe
+                                Bağlı)</span></label>
+                        <input type="file" id="productImage" name="image" class="form-input-custom file-input"
+                            accept="image/*">
+                    </div>
+
+                    <div class="form-actions-row">
+                        <button type="submit" id="btnSubmit" class="btn-gradient-primary">Kaydet & Ekle</button>
+                        <button type="button" id="btnCancelEdit" class="btn-cancel-edit" style="display: none;"
+                            onclick="resetForm()">İptal</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Mevcut Ürünler ve Sürükle-Bırak Sıralama -->
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">📋 Menü Sıralaması</h2>
+                    <span class="drag-hint-badge">💡 Sürükle & Bırak</span>
+                </div>
+                <p class="panel-subtitle">Listedeki elemanları basılı tutup yukarı/aşağı taşıyarak sırasını
+                    değiştirebilirsiniz.</p>
+
+                <ul class="admin-product-list" id="sortableList">
+                    {% for p in products %}
+                    <li draggable="true" data-id="{{ p.id }}" class="drag-item-card">
+                        <div class="drag-handle-grip" title="Sıralamak için sürükleyin">⋮⋮</div>
+                        <div class="prod-thumb-wrapper">
+                            {% if p.image_url %}
+                            <img src="{{ p.image_url }}" alt="{{ p.name }}" class="prod-thumb-img">
+                            {% else %}
+                            <div class="prod-thumb-placeholder">{{ p.name[:2]|upper }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="prod-details">
+                            <span class="prod-title">{{ p.name }}</span>
+                            <span
+                                class="prod-cat-pill {% if p.category == 'yemek' %}cat-yemek{% else %}cat-icecek{% endif %}">
+                                {% if p.category == 'yemek' %}🍽️ Yemek{% else %}☕ İçecek{% endif %}
+                            </span>
+                        </div>
+                        <div class="prod-actions">
+                            <button class="btn-action-edit"
+                                onclick="startEdit({{ p.id }}, '{{ p.name }}', '{{ p.category }}')">Düzenle</button>
+                            <button class="btn-action-delete" onclick="deleteProduct({{ p.id }})">Sil</button>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 3: ODA İSİMLERİ VE QR KOD YÖNETİMİ -->
+    <div id="adminTabRooms" class="admin-tab-content" style="display: none;">
+        <div class="glass-panel">
+            <div class="panel-header"
+                style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h2 class="panel-title">📱 Odalar & Mutfak QR Kod Oluşturucu</h2>
+                    <p class="panel-subtitle" style="margin-bottom: 0;">Mutfak paneli ve odalar için özel QR kodlar
+                        hazırlandı.</p>
+                </div>
+                <button type="button" class="btn-gradient-primary"
+                    style="width: auto; padding: 8px 16px; font-size: 0.85rem;" onclick="window.print()">
+                    🖨️ Tüm QR Kodları Yazdır
+                </button>
+            </div>
+
+            <div class="rooms-cards-grid" style="margin-top: 15px;">
+                <!-- MUTFAK SPECIAL QR CODE CARD -->
+                <div class="room-manage-card qr-printable-card" style="border: 2px solid #4338ca; background: #f5f3ff;">
+                    <div class="room-manage-header"
+                        style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="room-icon-badge" style="background: #4338ca; color: white;">👨‍🍳</div>
+                            <div>
+                                <span class="room-current-title" style="color: #4338ca; font-weight: 800;">Mutfak
+                                    Paneli</span>
+                                <span
+                                    style="color: #64748b; font-size: 0.85rem; font-weight: 500; margin-left: 4px;">(mutfak)</span>
+                            </div>
+                        </div>
+                        <a href="/mutfak" target="_blank" class="btn-open-url"
+                            style="text-decoration: none; background: #4338ca; color: white; border: none;">Sayfayı Aç
+                            ↗</a>
+                    </div>
+
+                    <!-- MUTFAK QR KOD ALANI -->
+                    <div
+                        style="background: #ffffff; border: 1px dashed #6366f1; padding: 15px; border-radius: 12px; text-align: center; margin: 10px 0;">
+                        <img class="qr-code-img" data-slug="mutfak" alt="Mutfak Paneli QR Kodu" width="160" height="160"
+                            style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white;">
+                        <p style="font-size: 0.75rem; color: #4338ca; margin-top: 6px; font-weight: 700;">Mutfak
+                            Ekranını Açmak İçin Okutun</p>
+                    </div>
+                </div>
+
+                <!-- ROOM CARDS -->
+                {% for r in rooms %}
+                <div class="room-manage-card qr-printable-card">
+                    <div class="room-manage-header"
+                        style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="room-icon-badge">🚪</div>
+                            <div>
+                                <span class="room-current-title">{{ r.name }}</span>
+                                <span
+                                    style="color: #64748b; font-size: 0.85rem; font-weight: 500; margin-left: 4px;">({{
+                                    r.slug }})</span>
+                            </div>
+                        </div>
+                        <a href="/{{ r.slug }}" target="_blank" class="btn-open-url"
+                            style="text-decoration: none;">Sayfayı Aç ↗</a>
+                    </div>
+
+                    <!-- ODA QR KOD ALANI -->
+                    <div
+                        style="background: #ffffff; border: 1px dashed #cbd5e1; padding: 15px; border-radius: 12px; text-align: center; margin: 10px 0;">
+                        <img class="qr-code-img" data-slug="{{ r.slug }}" alt="{{ r.name }} QR Kodu" width="160"
+                            height="160"
+                            style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white;">
+                        <p style="font-size: 0.75rem; color: #64748b; margin-top: 6px; font-weight: 600;">Sipariş Vermek
+                            İçin Okutun</p>
+                    </div>
+
+                    <div class="room-edit-box">
+                        <label class="form-label-custom" style="font-size: 0.75rem;">Oda İsmini Değiştir:</label>
+                        <form onsubmit="updateRoomName(event, {{ r.id }})" class="room-edit-form">
+                            <input type="text" id="roomInput-{{ r.id }}" value="{{ r.name }}"
+                                class="form-input-custom inline-input" required>
+                            <button type="submit" class="btn-save-mini">Kaydet</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Bildirim sesi -->
+<audio id="notificationSoundAdmin" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3"
+    preload="auto"></audio>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // QR KODLARI OTOMATİK OLUŞTURMA
+    document.addEventListener('DOMContentLoaded', () => {
+        generateQRCodes();
+    });
+
+    function generateQRCodes() {
+        let host = window.location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1') {
+            host = '{{ server_ip }}';
+        }
+        const port = window.location.port ? `:${window.location.port}` : '';
+        const baseUrl = `${window.location.protocol}//${host}${port}`;
+
+        document.querySelectorAll('.qr-code-img').forEach(img => {
+            const slug = img.dataset.slug;
+            const targetUrl = `${baseUrl}/${slug}`;
+            // High quality QR Code with full IP URL
+            img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(targetUrl)}`;
+        });
+    }
+
+    // TAB DEĞİŞTİRME
+    function switchAdminTab(tab) {
+        document.getElementById('tabBtnKitchen').classList.remove('active');
+        document.getElementById('tabBtnProducts').classList.remove('active');
+        document.getElementById('tabBtnRooms').classList.remove('active');
+
+        document.getElementById('adminTabKitchen').style.display = 'none';
+        document.getElementById('adminTabProducts').style.display = 'none';
+        document.getElementById('adminTabRooms').style.display = 'none';
+
+        if (tab === 'kitchen') {
+            document.getElementById('tabBtnKitchen').classList.add('active');
+            document.getElementById('adminTabKitchen').style.display = 'block';
+        } else if (tab === 'products') {
+            document.getElementById('tabBtnProducts').classList.add('active');
+            document.getElementById('adminTabProducts').style.display = 'block';
+        } else if (tab === 'rooms') {
+            document.getElementById('tabBtnRooms').classList.add('active');
+            document.getElementById('adminTabRooms').style.display = 'block';
+            generateQRCodes();
+        }
+    }
+
+    // ODA İSMİ GÜNCELLEME
+    async function updateRoomName(e, roomId) {
+        e.preventDefault();
+        const newName = document.getElementById(`roomInput-${roomId}`).value;
+        const formData = new FormData();
+        formData.append('name', newName);
+
+        const res = await fetch(`/api/rooms/${roomId}/update`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (res.ok) {
+            alert("Oda ismi başarıyla güncellendi!");
+            window.location.reload();
+        } else {
+            alert("Güncelleme başarısız.");
+        }
+    }
+
+    // CANLI MUTFAK ENTEGRASYONU (WEBSOCKET + API)
+    document.addEventListener('DOMContentLoaded', () => {
+        fetchAdminKitchenOrders();
+        setupAdminWebSocket();
+    });
+
+    function setupAdminWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/mutfak`);
+
+        ws.onmessage = (event) => {
+            if (event.data === 'new_order') {
+                playAdminSound();
+                fetchAdminKitchenOrders();
+            } else if (event.data === 'order_completed') {
+                fetchAdminKitchenOrders();
+            }
+        };
+
+        ws.onclose = () => {
+            setTimeout(setupAdminWebSocket, 3000);
+        };
+    }
+
+    function playAdminSound() {
+        const audio = document.getElementById('notificationSoundAdmin');
+        if (audio) {
+            audio.play().catch(e => console.log("Audio prevented:", e));
+        }
+    }
+
+    async function fetchAdminKitchenOrders() {
+        const res = await fetch('/api/orders/active');
+        const orders = await res.json();
+        renderAdminKitchenOrders(orders);
+    }
+
+    function renderAdminKitchenOrders(orders) {
+        const container = document.getElementById('kitchenOrdersContainer');
+        const countBadge = document.getElementById('activeOrdersCount');
+        countBadge.textContent = orders.length;
+
+        container.innerHTML = '';
+
+        if (orders.length === 0) {
+            container.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #64748b; font-size: 1rem; padding: 40px; background: white; border-radius: 14px; border: 1px dashed #cbd5e1;">Bekleyen sipariş bulunmuyor. Mutfak sakin ☕</div>';
+            return;
+        }
+
+        orders.forEach(order => {
+            const d = new Date(order.created_at + 'Z');
+            const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            const card = document.createElement('div');
+            card.className = 'order-card';
+
+            let itemsHtml = '<ul class="kitchen-items">';
+            let notesHtml = '';
+            order.items.forEach(item => {
+                itemsHtml += `<li><span>${item.product_name}</span> <span class="qty-badge">x${item.quantity}</span></li>`;
+                if (item.notes) {
+                    notesHtml = `<div class="order-notes"><strong>Not:</strong> ${item.notes}</div>`;
+                }
+            });
+            itemsHtml += '</ul>';
+
+            card.innerHTML = `
+            <div class="order-header">
+                <span class="room-badge">${order.room_name}</span>
+                <span class="time-badge">${timeStr}</span>
+            </div>
+            ${itemsHtml}
+            ${notesHtml}
+            <button class="btn-success" onclick="completeAdminOrder(${order.id})">Teslim Edildi İşaretle</button>
+        `;
+            container.appendChild(card);
+        });
+    }
+
+    async function completeAdminOrder(orderId) {
+        const res = await fetch(`/api/orders/${orderId}/complete`, { method: 'POST' });
+        if (res.ok) {
+            fetchAdminKitchenOrders();
+        }
+    }
+
+    // ÜRÜN FORM & SÜRÜKLE BIRAK İŞLEMLERİ
+    function startEdit(id, name, category) {
+        switchAdminTab('products');
+        document.getElementById('formTitle').textContent = '✏️ Ürün Düzenle';
+        document.getElementById('editProductId').value = id;
+        document.getElementById('productName').value = name;
+        document.getElementById('productCategory').value = category || 'icecek';
+        document.getElementById('btnSubmit').textContent = 'Değişiklikleri Kaydet';
+        document.getElementById('btnCancelEdit').style.display = 'inline-block';
+    }
+
+    function resetForm() {
+        document.getElementById('formTitle').textContent = '✨ Yeni Ürün Ekle';
+        document.getElementById('editProductId').value = '';
+        document.getElementById('productName').value = '';
+        document.getElementById('productCategory').value = 'icecek';
+        document.getElementById('productImage').value = '';
+        document.getElementById('btnSubmit').textContent = 'Kaydet & Ekle';
+        document.getElementById('btnCancelEdit').style.display = 'none';
+    }
+
+    async function handleFormSubmit(e) {
+        e.preventDefault();
+        const editId = document.getElementById('editProductId').value;
+        const formData = new FormData(document.getElementById('productForm'));
+
+        let url = '/api/products';
+        if (editId) {
+            url = `/api/products/${editId}/update`;
+        }
+
+        const res = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (res.ok) {
+            window.location.reload();
+        } else {
+            alert("İşlem başarısız.");
+        }
+    }
+
+    async function deleteProduct(id) {
+        if (!confirm("Bu ürünü silmek istediğinize emin misiniz?")) return;
+        const res = await fetch(`/api/products/${id}/delete`, { method: 'POST' });
+        if (res.ok) {
+            window.location.reload();
+        }
+    }
+
+    // DRAG & DROP
+    let draggedItem = null;
+    document.addEventListener('DOMContentLoaded', () => {
+        const list = document.getElementById('sortableList');
+        if (!list) return;
+
+        list.addEventListener('dragstart', (e) => {
+            const item = e.target.closest('.drag-item-card');
+            if (!item) return;
+            draggedItem = item;
+            item.style.opacity = '0.4';
+        });
+
+        list.addEventListener('dragend', (e) => {
+            const item = e.target.closest('.drag-item-card');
+            if (item) item.style.opacity = '1';
+            draggedItem = null;
+            saveOrder();
+        });
+
+        list.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const afterElement = getDragAfterElement(list, e.clientY);
+            if (afterElement == null) {
+                list.appendChild(draggedItem);
+            } else {
+                list.insertBefore(draggedItem, afterElement);
+            }
+        });
+    });
+
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.drag-item-card:not([style*="opacity: 0.4"])')];
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    async function saveOrder() {
+        const listItems = [...document.querySelectorAll('.drag-item-card')];
+        const orderIds = listItems.map(item => parseInt(item.dataset.id));
+
+        await fetch('/api/products/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: orderIds })
+        });
+    }
+</script>
+{% endblock %}

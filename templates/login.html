@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Yönetici Girişi - Makam Servis{% endblock %}
+
+{% block content %}
+<div class="select-room-container">
+    <div class="glass-card" style="max-width: 380px; width: 100%; text-align: center; padding: 35px 25px;">
+        <h1 style="font-size: 1.8rem; margin-bottom: 8px; color: var(--primary);">🔒 Yönetici Girişi</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 25px;">Lütfen devam etmek için giriş yapın.</p>
+
+        {% if error %}
+        <div style="background: #fee2e2; color: #dc2626; padding: 10px; border-radius: 8px; font-size: 0.9rem; margin-bottom: 20px; font-weight: 500;">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form action="/login" method="POST">
+            <div style="margin-bottom: 15px; text-align: left;">
+                <label style="font-size: 0.85rem; font-weight: 600; color: #4b5563; display: block; margin-bottom: 5px;">Kullanıcı Adı</label>
+                <input type="text" name="username" class="form-control" placeholder="Kullanıcı Adınız" required style="margin-bottom: 0;">
+            </div>
+
+            <div style="margin-bottom: 25px; text-align: left;">
+                <label style="font-size: 0.85rem; font-weight: 600; color: #4b5563; display: block; margin-bottom: 5px;">Şifre</label>
+                <input type="password" name="password" class="form-control" placeholder="Şifreniz" required style="margin-bottom: 0;">
+            </div>
+
+            <button type="submit" class="btn-primary" style="padding: 12px; font-size: 1rem;">Giriş Yap</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

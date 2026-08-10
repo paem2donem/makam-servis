@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}{{ room.name }}{% endblock %}
+
+{% block content %}
+<header class="app-header">
+    <div class="header-content">
+        <h1>{{ room.name }}</h1>
+    </div>
+</header>
+
+<main class="container">
+    <input type="hidden" id="roomId" value="{{ room.id }}">
+    
+    <!-- Kategori Filtre Butonları -->
+    <div class="category-tabs" style="display: flex; gap: 6px; margin-bottom: 10px; justify-content: center;">
+        <button class="btn-category active" onclick="filterCategory('all', this)">🍱 Tüm Menü</button>
+        <button class="btn-category" onclick="filterCategory('icecek', this)">☕ İçecekler</button>
+        <button class="btn-category" onclick="filterCategory('yemek', this)">🍽️ Yemekler</button>
+    </div>
+
+    <!-- İÇECEK SEKSİYONU (EN ÜSTTE) -->
+    <div id="section-icecek" class="menu-section">
+        <h2 class="section-title" style="margin-bottom: 3px; color: #1d4ed8; font-size: 0.9rem; display: flex; align-items: center; gap: 4px;">
+            ☕ İçecekler
+        </h2>
+        <div class="products-grid">
+            {% for p in drink_products %}
+            <div class="product-card" data-id="{{ p.id }}" data-name="{{ p.name }}" data-category="icecek">
+                <div class="product-image">
+                    {% if p.image_url %}
+                    <img src="{{ p.image_url }}" alt="{{ p.name }}">
+                    {% else %}
+                    <div class="placeholder-img">{{ p.name[:2]|upper }}</div>
+                    {% endif %}
+                </div>
+                <div class="product-info">
+                    <h3>{{ p.name }}</h3>
+                    <div class="quantity-controls">
+                        <button class="btn-qty minus" onclick="updateQty({{ p.id }}, -1)">-</button>
+                        <span class="qty" id="qty-{{ p.id }}">0</span>
+                        <button class="btn-qty plus" onclick="updateQty({{ p.id }}, 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p style="color: #6b7280; grid-column: 1/-1; font-size: 0.8rem;">Kayıtlı içecek bulunmuyor.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- YEMEK SEKSİYONU -->
+    <div id="section-yemek" class="menu-section" style="margin-top: 32px;">
+        <h2 class="section-title" style="margin-bottom: 3px; color: #b45309; font-size: 0.9rem; display: flex; align-items: center; gap: 4px;">
+            🍽️ Yemekler
+        </h2>
+        <div class="products-grid">
+            {% for p in food_products %}
+            <div class="product-card" data-id="{{ p.id }}" data-name="{{ p.name }}" data-category="yemek">
+                <div class="product-image">
+                    {% if p.image_url %}
+                    <img src="{{ p.image_url }}" alt="{{ p.name }}">
+                    {% else %}
+                    <div class="placeholder-img">{{ p.name[:2]|upper }}</div>
+                    {% endif %}
+                </div>
+                <div class="product-info">
+                    <h3>{{ p.name }}</h3>
+                    <div class="quantity-controls">
+                        <button class="btn-qty minus" onclick="updateQty({{ p.id }}, -1)">-</button>
+                        <span class="qty" id="qty-{{ p.id }}">0</span>
+                        <button class="btn-qty plus" onclick="updateQty({{ p.id }}, 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p style="color: #6b7280; grid-column: 1/-1; font-size: 0.8rem;">Kayıtlı yemek bulunmuyor.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="order-panel" id="orderPanel">
+        <div class="order-summary">
+            <h3 class="panel-title">Siparişiniz</h3>
+            <ul id="cartItems" class="cart-list">
+                <li class="empty-text">Sepetiniz boş.</li>
+            </ul>
+            <div id="orderControls" style="display: none;">
+                <textarea id="orderNotes" placeholder="Varsa notunuzu buraya yazın..." class="form-control"></textarea>
+                <button id="btnSubmitOrder" class="btn-primary btn-block" onclick="submitOrder()">Siparişi Mutfağa Gönder</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">Siparişiniz başarıyla gönderildi!</div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/main.js"></script>
+<script>
+function filterCategory(cat, btn) {
+    document.querySelectorAll('.btn-category').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    
+    const secYemek = document.getElementById('section-yemek');
+    const secIcecek = document.getElementById('section-icecek');
+
+    if (cat === 'all') {
+        secIcecek.style.display = 'block';
+        secYemek.style.display = 'block';
+    } else if (cat === 'icecek') {
+        secIcecek.style.display = 'block';
+        secYemek.style.display = 'none';
+    } else if (cat === 'yemek') {
+        secIcecek.style.display = 'none';
+        secYemek.style.display = 'block';
+    }
+}
+</script>
+{% endblock %}
