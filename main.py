@@ -212,6 +212,41 @@ async def update_room(
     db.commit()
     return {"status": "success"}
 
+@app.post("/api/rooms/create")
+async def create_room(
+    request: Request,
+    name: str = Form(...),
+    slug: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    if not is_admin_authenticated(request):
+        return {"error": "Yetkisiz erişim"}
+    
+    # Check if slug exists
+    exists = db.query(models.Room).filter(models.Room.slug == slug).first()
+    if exists:
+        return {"error": "Bu link (slug) zaten kullanımda!"}
+        
+    new_room = models.Room(name=name, slug=slug)
+    db.add(new_room)
+    db.commit()
+    return {"status": "success"}
+
+@app.delete("/api/rooms/{room_id}")
+async def delete_room(
+    request: Request,
+    room_id: int,
+    db: Session = Depends(get_db)
+):
+    if not is_admin_authenticated(request):
+        return {"error": "Yetkisiz erişim"}
+    room = db.query(models.Room).filter(models.Room.id == room_id).first()
+    if not room:
+        return {"error": "Oda bulunamadı"}
+    db.delete(room)
+    db.commit()
+    return {"status": "success"}
+
 @app.post("/api/orders")
 async def create_order(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
