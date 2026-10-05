@@ -321,21 +321,36 @@
                         </div>
 
                         <div class="room-edit-box">
-                            <form onsubmit="updateRoom(event, {{ r.id }})" class="room-edit-form" style="display: flex; flex-direction: column; gap: 6px;">
-                                <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 0;">Oda İsmi & Bağlı Olduğu Kat Mutfağı:</label>
-                                <input type="text" id="roomInput-{{ r.id }}" value="{{ r.name }}"
-                                    class="form-input-custom inline-input" style="font-size: 0.85rem;" required>
+                            <form onsubmit="updateRoom(event, {{ r.id }})" class="room-edit-form" style="display: flex; flex-direction: column; gap: 8px;">
+                                <div>
+                                    <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 2px; color: #475569; font-weight: 600;">Oda İsmi:</label>
+                                    <input type="text" id="roomInput-{{ r.id }}" value="{{ r.name }}"
+                                        class="form-input-custom inline-input" style="font-size: 0.85rem; width: 100%; box-sizing: border-box;" required placeholder="Örn: Onur Abi">
+                                </div>
                                 
-                                <select id="roomFloor-{{ r.id }}" class="form-input-custom inline-input" style="font-size: 0.85rem;">
-                                    <option value="makam" {% if r.floor == 'makam' or not r.floor %}selected{% endif %}>👑 Makam Katı Mutfağı</option>
-                                    <option value="kat-3" {% if r.floor == 'kat-3' %}selected{% endif %}>🏢 3. Kat Mutfağı</option>
-                                    <option value="kat-4" {% if r.floor == 'kat-4' %}selected{% endif %}>🏢 4. Kat Mutfağı</option>
-                                    <option value="kat-5" {% if r.floor == 'kat-5' %}selected{% endif %}>🏢 5. Kat Mutfağı</option>
-                                    <option value="kat-6" {% if r.floor == 'kat-6' %}selected{% endif %}>🏢 6. Kat Mutfağı</option>
-                                </select>
+                                <div>
+                                    <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 2px; color: #475569; font-weight: 600;">Sayfa Linki (URL):</label>
+                                    <div style="display: flex; align-items: center; background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding-left: 8px; box-sizing: border-box;">
+                                        <span style="color: #64748b; font-size: 0.85rem; font-weight: 700;">/</span>
+                                        <input type="text" id="roomSlug-{{ r.id }}" value="{{ r.slug }}"
+                                            class="inline-input" style="border: none; outline: none; font-size: 0.85rem; padding: 6px 8px; width: 100%; color: #0f172a; font-weight: 600;" required placeholder="Örn: kat5-C">
+                                    </div>
+                                    <span style="font-size: 0.68rem; color: #94a3b8; display: block; margin-top: 2px;">Örnek: kat5-C yazarsanız link /kat5-C olur.</span>
+                                </div>
+                                
+                                <div>
+                                    <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 2px; color: #475569; font-weight: 600;">Bağlı Olduğu Kat Mutfağı:</label>
+                                    <select id="roomFloor-{{ r.id }}" class="form-input-custom inline-input" style="font-size: 0.85rem; width: 100%; box-sizing: border-box;">
+                                        <option value="makam" {% if r.floor == 'makam' or not r.floor %}selected{% endif %}>👑 Makam Katı Mutfağı</option>
+                                        <option value="kat-3" {% if r.floor == 'kat-3' %}selected{% endif %}>🏢 3. Kat Mutfağı</option>
+                                        <option value="kat-4" {% if r.floor == 'kat-4' %}selected{% endif %}>🏢 4. Kat Mutfağı</option>
+                                        <option value="kat-5" {% if r.floor == 'kat-5' %}selected{% endif %}>🏢 5. Kat Mutfağı</option>
+                                        <option value="kat-6" {% if r.floor == 'kat-6' %}selected{% endif %}>🏢 6. Kat Mutfağı</option>
+                                    </select>
+                                </div>
                                 
                                 <div style="display: flex; gap: 6px; margin-top: 2px;">
-                                    <button type="submit" class="btn-save-mini" style="flex: 1;">Kaydet</button>
+                                    <button type="submit" class="btn-save-mini" style="flex: 1;">💾 Kaydet</button>
                                     <button type="button" class="btn-save-mini" style="background: #ef4444; width: auto; padding: 6px 12px;" onclick="deleteRoom({{ r.id }})">Sil</button>
                                 </div>
                             </form>
@@ -526,25 +541,32 @@
         }
     }
 
-    // ODA GÜNCELLEME (İSİM + KAT)
+    // ODA GÜNCELLEME (İSİM + LİNK + KAT)
     async function updateRoom(e, roomId) {
         e.preventDefault();
         const newName = document.getElementById(`roomInput-${roomId}`).value;
+        const newSlug = document.getElementById(`roomSlug-${roomId}`).value;
         const newFloor = document.getElementById(`roomFloor-${roomId}`).value;
         const formData = new FormData();
         formData.append('name', newName);
+        formData.append('slug', newSlug);
         formData.append('floor', newFloor);
 
-        const res = await fetch(`/api/rooms/${roomId}/update`, {
-            method: 'POST',
-            body: formData
-        });
+        try {
+            const res = await fetch(`/api/rooms/${roomId}/update`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
 
-        if (res.ok) {
-            alert("Oda ve kat bilgisi başarıyla güncellendi!");
-            window.location.reload();
-        } else {
-            alert("Güncelleme başarısız.");
+            if (res.ok && !data.error) {
+                alert("Oda, link ve kat bilgisi başarıyla güncellendi!");
+                window.location.reload();
+            } else {
+                alert(data.error || "Güncelleme başarısız.");
+            }
+        } catch (err) {
+            alert("Bir hata oluştu: " + err);
         }
     }
 

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Depends, F
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import text
+from sqlalchemy import text, func
 from sqlalchemy.orm import Session
 from database import engine, Base, get_db
 import models
@@ -10,6 +10,22 @@ import os
 import shutil
 import datetime
 import socket
+import re
+
+RESERVED_SLUGS = {"admin", "mutfak", "api", "static", "uploads", "login", "logout", "docs", "redoc", "openapi.json", "favicon.ico"}
+
+def normalize_slug(slug_str: str) -> str:
+    if not slug_str:
+        return ""
+    s = slug_str.strip().lstrip("/")
+    # Replace Turkish special characters
+    tr_map = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
+    s = s.translate(tr_map)
+    # Replace spaces and underscores with hyphens
+    s = re.sub(r'[\s_]+', '-', s)
+    # Remove chars that are not alphanumeric or hyphen
+    s = re.sub(r'[^a-zA-Z0-9\-]', '', s)
+    return s.strip('-')
 
 # Create tables
 models.Base.metadata.create_all(bind=engine)
@@ -255,7 +271,8 @@ async def admin_panel(request: Request, db: Session = Depends(get_db)):
 # Catch-all room slug route MUST be at the end of page routes
 @app.get("/{room_slug}", response_class=HTMLResponse)
 async def show_room_page(request: Request, room_slug: str, db: Session = Depends(get_db)):
-    room_obj = db.query(models.Room).filter(models.Room.slug == room_slug).first()
+    # Case-insensitive lookup so both /kat5-C and /kat5-c work
+    room_obj = db.query(models.Room).filter(func.lower(models.Room.slug) == room_slug.lower()).first()
     if not room_obj:
         rooms = db.query(models.Room).all()
         return templates.TemplateResponse(request=request, name="select_room.html", context={"rooms": rooms, "error": "Geçersiz oda!"})
@@ -279,6 +296,7 @@ async def update_room(
     request: Request,
     room_id: int,
     name: str = Form(...),
+    slug: str = Form(None),
     floor: str = Form("makam"),
     db: Session = Depends(get_db)
 ):
@@ -287,8 +305,19 @@ async def update_room(
     room = db.query(models.Room).filter(models.Room.id == room_id).first()
     if not room:
         return {"error": "Oda bulunamadı"}
-    room.name = name
+    room.name = name.strip()
     room.floor = floor
+    if slug:
+        clean_slug = normalize_slug(slug)
+        if not clean_slug:
+            return {"error": "Geçerli bir bağlantı linki giriniz."}
+        if clean_slug.lower() in RESERVED_SLUGS:
+            return {"error": f"'{clean_slug}' sistem tarafından kullanılan özel bir linktir. Lütfen başka bir link belirleyin."}
+        # Check if slug exists in another room
+        exists = db.query(models.Room).filter(func.lower(models.Room.slug) == clean_slug.lower(), models.Room.id != room_id).first()
+        if exists:
+            return {"error": f"'{clean_slug}' linki zaten başka bir odada kullanımda!"}
+        room.slug = clean_slug
     db.commit()
     return {"status": "success"}
 
@@ -303,12 +332,16 @@ async def create_room(
     if not is_admin_authenticated(request):
         return {"error": "Yetkisiz erişim"}
     
-    # Check if slug exists
-    exists = db.query(models.Room).filter(models.Room.slug == slug).first()
+    clean_slug = normalize_slug(slug)
+    if not clean_slug:
+        return {"error": "Geçerli bir bağlantı linki giriniz."}
+    if clean_slug.lower() in RESERVED_SLUGS:
+        return {"error": f"'{clean_slug}' sistem tarafından kullanılan özel bir linktir. Lütfen başka bir link belirleyin."}
+    exists = db.query(models.Room).filter(func.lower(models.Room.slug) == clean_slug.lower()).first()
     if exists:
-        return {"error": "Bu link (slug) zaten kullanımda!"}
+        return {"error": f"'{clean_slug}' linki zaten kullanımda!"}
         
-    new_room = models.Room(name=name, slug=slug, floor=floor)
+    new_room = models.Room(name=name.strip(), slug=clean_slug, floor=floor)
     db.add(new_room)
     db.commit()
     return {"status": "success"}
