@@ -381,12 +381,8 @@
     });
 
     function generateQRCodes() {
-        let host = window.location.hostname;
-        if (host === 'localhost' || host === '127.0.0.1') {
-            host = '{{ server_ip }}';
-        }
-        const port = (window.location.port && window.location.port !== '80' && window.location.port !== '443') ? `:${window.location.port}` : '';
-        const baseUrl = `${window.location.protocol}//${host}${port}`;
+        // Doğrudan sabit sunucu IP adresiyle QR kod üret
+        const baseUrl = 'http://152.70.188.116';
 
         document.querySelectorAll('.qr-code-img').forEach(img => {
             const slug = img.dataset.slug;
