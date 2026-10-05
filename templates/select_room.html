@@ -3,28 +3,78 @@
 {% block title %}Oda Seçimi - Makam Servis{% endblock %}
 
 {% block content %}
-<div class="select-room-container">
-    <div class="glass-card room-select-card">
-        <div class="room-select-header">
-            <div class="select-logo-badge">🏛️</div>
-            <h1>Makam Servis</h1>
-            <p>Lütfen ikram siparişi vermek istediğiniz odayı seçin</p>
+<div class="select-room-container" style="max-width: 650px; margin: 30px auto; padding: 0 15px;">
+    <div class="glass-card room-select-card" style="padding: 25px; border-radius: 16px;">
+        <div class="room-select-header" style="text-align: center; margin-bottom: 25px;">
+            <div class="select-logo-badge" style="width: 56px; height: 56px; line-height: 56px; font-size: 1.8rem; margin: 0 auto 12px auto; background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%); border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">🏛️</div>
+            <h1 style="font-size: 1.5rem; font-weight: 800; color: #1e293b; margin-bottom: 6px;">Makam Servis</h1>
+            <p style="color: #64748b; font-size: 0.9rem;">Lütfen sipariş vermek istediğiniz odayı veya makamı seçin</p>
         </div>
 
         {% if error %}
-        <div class="error-alert">
+        <div class="error-alert" style="background: #fee2e2; border-left: 4px solid #ef4444; color: #b91c1c; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.85rem;">
             {{ error }}
         </div>
         {% endif %}
 
-        <div class="room-buttons-grid">
+        {% set floor_keys = ['makam', 'kat-3', 'kat-4', 'kat-5', 'kat-6'] %}
+        {% for f_key in floor_keys %}
+            {% set floor_rooms = [] %}
             {% for r in rooms %}
-            <a href="/{{ r.slug }}" class="btn-room-select">
-                <span class="room-select-icon">🚪</span>
-                <span class="room-select-name">{{ r.name }}</span>
-                <span class="room-select-arrow">→</span>
-            </a>
+                {% if (r.floor == f_key) or (not r.floor and f_key == 'makam') %}
+                    {% set _ = floor_rooms.append(r) %}
+                {% endif %}
             {% endfor %}
+
+            {% if floor_rooms|length > 0 %}
+            <div class="floor-group-section" style="margin-bottom: 24px;">
+                <h3 style="font-size: 0.95rem; font-weight: 700; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                    <span>{% if f_key == 'makam' %}👑{% else %}🏢{% endif %}</span>
+                    <span>{{ floors.get(f_key, f_key) }} Odaları</span>
+                </h3>
+                <div class="room-buttons-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+                    {% for r in floor_rooms %}
+                    <a href="/{{ r.slug }}" class="btn-room-select" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; text-decoration: none; display: flex; align-items: center; justify-content: space-between; transition: all 0.15s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                        <span style="display: flex; align-items: center; gap: 8px;">
+                            <span class="room-select-icon">🚪</span>
+                            <span class="room-select-name" style="color: #1e293b; font-weight: 600; font-size: 0.88rem;">{{ r.name }}</span>
+                        </span>
+                        <span class="room-select-arrow" style="color: #94a3b8; font-weight: bold;">→</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Fallback if any rooms have other unmapped floors -->
+        {% set other_rooms = [] %}
+        {% for r in rooms %}
+            {% if r.floor and r.floor not in floor_keys %}
+                {% set _ = other_rooms.append(r) %}
+            {% endif %}
+        {% endfor %}
+        {% if other_rooms|length > 0 %}
+        <div class="floor-group-section" style="margin-bottom: 20px;">
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: #475569; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 10px;">Diğer Odalar</h3>
+            <div class="room-buttons-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+                {% for r in other_rooms %}
+                <a href="/{{ r.slug }}" class="btn-room-select" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; text-decoration: none; display: flex; align-items: center; justify-content: space-between;">
+                    <span style="display: flex; align-items: center; gap: 8px;">
+                        <span class="room-select-icon">🚪</span>
+                        <span class="room-select-name" style="color: #1e293b; font-weight: 600; font-size: 0.88rem;">{{ r.name }}</span>
+                    </span>
+                    <span class="room-select-arrow" style="color: #94a3b8;">→</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div style="margin-top: 25px; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 15px; display: flex; justify-content: center; gap: 20px;">
+            <a href="/mutfak" style="font-size: 0.85rem; color: #2563eb; text-decoration: none; font-weight: 600;">👨‍🍳 Mutfak Panelleri</a>
+            <span style="color: #cbd5e1;">•</span>
+            <a href="/admin" style="font-size: 0.85rem; color: #64748b; text-decoration: none;">⚙️ Yönetici Girişi</a>
         </div>
     </div>
 </div>

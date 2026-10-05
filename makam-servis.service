@@ -1,0 +1,14 @@
+[Unit]
+Description=Makam Servis FastAPI Uygulamasi
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Makam_Servis
+ExecStart=/home/ubuntu/Makam_Servis/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+Environment="PATH=/home/ubuntu/Makam_Servis/venv/bin"
+
+[Install]
+WantedBy=multi-user.target

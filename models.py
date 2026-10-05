@@ -8,6 +8,7 @@ class Room(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, index=True)
     slug = Column(String, unique=True, index=True)
+    floor = Column(String, default="makam", index=True) # 'makam', 'kat-3', 'kat-4', 'kat-5', 'kat-6'
 
 class Product(Base):
     __tablename__ = "products"
@@ -22,6 +23,7 @@ class Order(Base):
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, index=True)
     room_id = Column(Integer, ForeignKey("rooms.id"))
+    floor = Column(String, default="makam", index=True) # 'makam', 'kat-3', 'kat-4', 'kat-5', 'kat-6'
     status = Column(String, default="pending") # pending, completed
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)

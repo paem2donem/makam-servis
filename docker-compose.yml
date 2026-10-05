@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  makam_servis:
+    build: .
+    container_name: makam_servis_app
+    restart: always
+    ports:
+      - "80:8000"
+    volumes:
+      - ./data:/data
+      - ./uploads:/app/uploads
+    environment:
+      - DATA_DIR=/data
+      # Opsiyonel: Eğer harici PostgreSQL kullanmak isterseniz aşağıdaki satırı açabilirsiniz:
+      # - DATABASE_URL=postgresql://user:pass@host:5432/dbname

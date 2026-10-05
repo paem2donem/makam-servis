@@ -48,23 +48,48 @@ def get_local_ip() -> str:
     except Exception:
         return "127.0.0.1"
 
+FLOORS = {
+    "makam": "Makam Katı Mutfağı",
+    "kat-3": "3. Kat Mutfağı",
+    "kat-4": "4. Kat Mutfağı",
+    "kat-5": "5. Kat Mutfağı",
+    "kat-6": "6. Kat Mutfağı"
+}
+
 def is_admin_authenticated(request: Request) -> bool:
     return request.cookies.get("admin_session") == "authenticated"
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: list[WebSocket] = []
+        # floor -> list of websocket connections
+        self.active_connections: dict[str, list[WebSocket]] = {}
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket, floor: str = "all"):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        if floor not in self.active_connections:
+            self.active_connections[floor] = []
+        self.active_connections[floor].append(websocket)
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+    def disconnect(self, websocket: WebSocket, floor: str = "all"):
+        if floor in self.active_connections and websocket in self.active_connections[floor]:
+            self.active_connections[floor].remove(websocket)
 
-    async def broadcast(self, message: str):
-        for connection in self.active_connections:
-            await connection.send_text(message)
+    async def broadcast(self, message: str, floor: str = None):
+        targets = []
+        # Target specific floor
+        if floor and floor in self.active_connections:
+            targets.extend(self.active_connections[floor])
+        # Also always broadcast to "all" (admin or master kitchen monitors)
+        if "all" in self.active_connections:
+            for ws in self.active_connections["all"]:
+                if ws not in targets:
+                    targets.append(ws)
+        
+        for connection in targets:
+            try:
+                await connection.send_text(message)
+            except Exception:
+                pass
 
 manager = ConnectionManager()
 
@@ -80,21 +105,58 @@ def check_schema():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE rooms ADD COLUMN floor VARCHAR DEFAULT 'makam'"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN floor VARCHAR DEFAULT 'makam'"))
+            conn.commit()
+        except Exception:
+            pass
 
 def init_db(db: Session):
     check_schema()
     # Add default rooms if empty
     if not db.query(models.Room).first():
         rooms = [
-            {"name": "Özel Kalem", "slug": "ozel-kalem"},
-            {"name": "Büro Amiri", "slug": "buro-amiri"},
-            {"name": "Makam 1", "slug": "makam-1"},
-            {"name": "Makam 2", "slug": "makam-2"},
-            {"name": "Makam 3", "slug": "makam-3"},
-            {"name": "Makam 4", "slug": "makam-4"},
+            {"name": "Özel Kalem", "slug": "ozel-kalem", "floor": "makam"},
+            {"name": "Büro Amiri", "slug": "buro-amiri", "floor": "makam"},
+            {"name": "Makam 1", "slug": "makam-1", "floor": "makam"},
+            {"name": "Makam 2", "slug": "makam-2", "floor": "makam"},
+            {"name": "3. Kat Toplantı Odası", "slug": "kat3-toplanti", "floor": "kat-3"},
+            {"name": "4. Kat Çalışma Odası", "slug": "kat4-calisma", "floor": "kat-4"},
+            {"name": "5. Kat Koordinasyon", "slug": "kat5-koordinasyon", "floor": "kat-5"},
+            {"name": "6. Kat Yönetim", "slug": "kat6-yonetim", "floor": "kat-6"},
         ]
         for r in rooms:
             db.add(models.Room(**r))
+        db.commit()
+    else:
+        # Ensure rooms without a floor are assigned to 'makam'
+        try:
+            db.execute(text("UPDATE rooms SET floor = 'makam' WHERE floor IS NULL OR floor = ''"))
+            db.commit()
+        except Exception:
+            pass
+
+    # Add default products if empty
+    if not db.query(models.Product).first():
+        default_products = [
+            {"name": "Çay", "category": "icecek", "display_order": 1},
+            {"name": "Türk Kahvesi", "category": "icecek", "display_order": 2},
+            {"name": "Su", "category": "icecek", "display_order": 3},
+            {"name": "Soda", "category": "icecek", "display_order": 4},
+            {"name": "Meyve Suyu", "category": "icecek", "display_order": 5},
+            {"name": "Limonata", "category": "icecek", "display_order": 6},
+            {"name": "Filtre Kahve", "category": "icecek", "display_order": 7},
+            {"name": "Bitki Çayı", "category": "icecek", "display_order": 8},
+            {"name": "Kuru Pasta", "category": "yemek", "display_order": 9},
+            {"name": "Sandviç", "category": "yemek", "display_order": 10},
+        ]
+        for p in default_products:
+            db.add(models.Product(**p, is_available=True))
         db.commit()
 
     image_mappings = {
@@ -139,7 +201,7 @@ async def read_root(request: Request, room: str = None, db: Session = Depends(ge
     if room:
         return await show_room_page(request, room, db)
     rooms = db.query(models.Room).all()
-    return templates.TemplateResponse(request=request, name="select_room.html", context={"rooms": rooms})
+    return templates.TemplateResponse(request=request, name="select_room.html", context={"rooms": rooms, "floors": FLOORS})
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
@@ -162,8 +224,19 @@ async def logout():
     return response
 
 @app.get("/mutfak", response_class=HTMLResponse)
-async def kitchen_dashboard(request: Request):
-    return templates.TemplateResponse(request=request, name="kitchen.html", context={})
+async def kitchen_selector(request: Request):
+    return templates.TemplateResponse(request=request, name="kitchen_select.html", context={"floors": FLOORS})
+
+@app.get("/mutfak/{floor}", response_class=HTMLResponse)
+async def kitchen_dashboard(request: Request, floor: str):
+    if floor not in FLOORS and floor != "all":
+        floor = "makam"
+    floor_name = FLOORS.get(floor, "Tüm Mutfaklar" if floor == "all" else "Mutfak Paneli")
+    return templates.TemplateResponse(request=request, name="kitchen.html", context={
+        "floor": floor,
+        "floor_name": floor_name,
+        "floors": FLOORS
+    })
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_panel(request: Request, db: Session = Depends(get_db)):
@@ -172,7 +245,12 @@ async def admin_panel(request: Request, db: Session = Depends(get_db)):
     products = db.query(models.Product).order_by(models.Product.display_order.asc(), models.Product.id.asc()).all()
     rooms = db.query(models.Room).all()
     server_ip = get_local_ip()
-    return templates.TemplateResponse(request=request, name="admin.html", context={"products": products, "rooms": rooms, "server_ip": server_ip})
+    return templates.TemplateResponse(request=request, name="admin.html", context={
+        "products": products, 
+        "rooms": rooms, 
+        "server_ip": server_ip,
+        "floors": FLOORS
+    })
 
 # Catch-all room slug route MUST be at the end of page routes
 @app.get("/{room_slug}", response_class=HTMLResponse)
@@ -201,6 +279,7 @@ async def update_room(
     request: Request,
     room_id: int,
     name: str = Form(...),
+    floor: str = Form("makam"),
     db: Session = Depends(get_db)
 ):
     if not is_admin_authenticated(request):
@@ -209,6 +288,7 @@ async def update_room(
     if not room:
         return {"error": "Oda bulunamadı"}
     room.name = name
+    room.floor = floor
     db.commit()
     return {"status": "success"}
 
@@ -217,6 +297,7 @@ async def create_room(
     request: Request,
     name: str = Form(...),
     slug: str = Form(...),
+    floor: str = Form("makam"),
     db: Session = Depends(get_db)
 ):
     if not is_admin_authenticated(request):
@@ -227,7 +308,7 @@ async def create_room(
     if exists:
         return {"error": "Bu link (slug) zaten kullanımda!"}
         
-    new_room = models.Room(name=name, slug=slug)
+    new_room = models.Room(name=name, slug=slug, floor=floor)
     db.add(new_room)
     db.commit()
     return {"status": "success"}
@@ -256,7 +337,10 @@ async def create_order(request: Request, db: Session = Depends(get_db)):
     if not room_id or not items:
         return {"error": "Eksik veri"}
         
-    new_order = models.Order(room_id=room_id)
+    room = db.query(models.Room).filter(models.Room.id == room_id).first()
+    floor = room.floor if room and room.floor else "makam"
+    
+    new_order = models.Order(room_id=room_id, floor=floor)
     db.add(new_order)
     db.commit()
     db.refresh(new_order)
@@ -272,14 +356,17 @@ async def create_order(request: Request, db: Session = Depends(get_db)):
     
     db.commit()
     
-    # Broadcast to kitchen
-    await manager.broadcast("new_order")
+    # Broadcast to specific floor's kitchen and admin
+    await manager.broadcast("new_order", floor=floor)
     
-    return {"status": "success", "order_id": new_order.id}
+    return {"status": "success", "order_id": new_order.id, "floor": floor}
 
 @app.get("/api/orders/active")
-async def get_active_orders(db: Session = Depends(get_db)):
-    orders = db.query(models.Order).filter(models.Order.status == "pending").order_by(models.Order.created_at.desc()).all()
+async def get_active_orders(floor: str = None, db: Session = Depends(get_db)):
+    query = db.query(models.Order).filter(models.Order.status == "pending")
+    if floor and floor != "all":
+        query = query.filter(models.Order.floor == floor)
+    orders = query.order_by(models.Order.created_at.desc()).all()
     result = []
     for o in orders:
         items = []
@@ -289,9 +376,13 @@ async def get_active_orders(db: Session = Depends(get_db)):
                 "quantity": i.quantity,
                 "notes": i.notes
             })
+        floor_key = o.floor or "makam"
+        floor_name = FLOORS.get(floor_key, "Makam Katı Mutfağı")
         result.append({
             "id": o.id,
             "room_name": o.room.name if o.room else "Bilinmeyen Oda",
+            "floor": floor_key,
+            "floor_name": floor_name,
             "created_at": o.created_at.isoformat(),
             "items": items
         })
@@ -303,8 +394,9 @@ async def complete_order(order_id: int, db: Session = Depends(get_db)):
     if order:
         order.status = "completed"
         order.completed_at = datetime.datetime.utcnow()
+        floor = order.floor or "makam"
         db.commit()
-        await manager.broadcast("order_completed")
+        await manager.broadcast("order_completed", floor=floor)
         return {"status": "success"}
     return {"error": "Sipariş bulunamadı"}
 
@@ -373,11 +465,20 @@ async def update_product(
 # WEBSOCKET
 # ==============================================================================
 
-@app.websocket("/ws/mutfak")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+@app.websocket("/ws/mutfak/{floor}")
+async def websocket_floor_endpoint(websocket: WebSocket, floor: str):
+    await manager.connect(websocket, floor)
     try:
         while True:
-            data = await websocket.receive_text()
+            await websocket.receive_text()
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(websocket, floor)
+
+@app.websocket("/ws/mutfak")
+async def websocket_all_endpoint(websocket: WebSocket):
+    await manager.connect(websocket, "all")
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, "all")

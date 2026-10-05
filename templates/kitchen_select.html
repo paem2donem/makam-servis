@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Mutfak Seçimi - Makam Servis{% endblock %}
+
+{% block content %}
+<div class="select-room-container">
+    <div class="glass-card room-select-card" style="max-width: 650px;">
+        <div class="room-select-header">
+            <div class="select-logo-badge" style="background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);">👨‍🍳</div>
+            <h1>Mutfak Panelleri</h1>
+            <p>Lütfen takip etmek istediğiniz kat mutfağını seçin</p>
+        </div>
+
+        <div class="kitchen-selection-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 20px;">
+            <a href="/mutfak/makam" class="btn-kitchen-floor-card" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: white; padding: 20px; border-radius: 14px; text-decoration: none; display: flex; align-items: center; gap: 14px; box-shadow: 0 4px 14px rgba(49, 46, 129, 0.25); transition: transform 0.15s ease;">
+                <span style="font-size: 2rem;">👑</span>
+                <div>
+                    <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0; color: #fbbf24;">Makam Katı Mutfağı</h3>
+                    <p style="font-size: 0.8rem; color: #c7d2fe; margin-top: 4px; margin-bottom: 0;">Makam ve Özel Kalem Siparişleri</p>
+                </div>
+            </a>
+
+            <a href="/mutfak/kat-3" class="btn-kitchen-floor-card" style="background: white; border: 1px solid #e2e8f0; color: #1e293b; padding: 20px; border-radius: 14px; text-decoration: none; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: transform 0.15s ease;">
+                <span style="font-size: 2rem;">🏢</span>
+                <div>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; color: #2563eb;">3. Kat Mutfağı</h3>
+                    <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px; margin-bottom: 0;">3. Kat Birimleri & Ofisleri</p>
+                </div>
+            </a>
+
+            <a href="/mutfak/kat-4" class="btn-kitchen-floor-card" style="background: white; border: 1px solid #e2e8f0; color: #1e293b; padding: 20px; border-radius: 14px; text-decoration: none; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: transform 0.15s ease;">
+                <span style="font-size: 2rem;">🏢</span>
+                <div>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; color: #059669;">4. Kat Mutfağı</h3>
+                    <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px; margin-bottom: 0;">4. Kat Birimleri & Ofisleri</p>
+                </div>
+            </a>
+
+            <a href="/mutfak/kat-5" class="btn-kitchen-floor-card" style="background: white; border: 1px solid #e2e8f0; color: #1e293b; padding: 20px; border-radius: 14px; text-decoration: none; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: transform 0.15s ease;">
+                <span style="font-size: 2rem;">🏢</span>
+                <div>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; color: #d97706;">5. Kat Mutfağı</h3>
+                    <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px; margin-bottom: 0;">5. Kat Birimleri & Ofisleri</p>
+                </div>
+            </a>
+
+            <a href="/mutfak/kat-6" class="btn-kitchen-floor-card" style="background: white; border: 1px solid #e2e8f0; color: #1e293b; padding: 20px; border-radius: 14px; text-decoration: none; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); transition: transform 0.15s ease;">
+                <span style="font-size: 2rem;">🏢</span>
+                <div>
+                    <h3 style="font-size: 1.05rem; font-weight: 700; margin: 0; color: #7c3aed;">6. Kat Mutfağı</h3>
+                    <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px; margin-bottom: 0;">6. Kat Birimleri & Ofisleri</p>
+                </div>
+            </a>
+        </div>
+
+        <div style="margin-top: 25px; text-align: center;">
+            <a href="/admin" style="font-size: 0.85rem; color: #64748b; text-decoration: underline;">⚙️ Yönetici Paneline Git</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

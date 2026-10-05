@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
-    fetchOrders();
-    setupWebSocket();
+    const appEl = document.getElementById('kitchenApp');
+    const currentFloor = appEl ? (appEl.dataset.floor || 'makam') : 'makam';
+    
+    fetchOrders(currentFloor);
+    setupWebSocket(currentFloor);
     armAudioPermanently();
 });
 
@@ -24,21 +27,21 @@ function armAudioPermanently() {
     document.addEventListener('keydown', unlockAudio);
 }
 
-function setupWebSocket() {
+function setupWebSocket(currentFloor) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/mutfak`);
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/mutfak/${currentFloor}`);
 
     ws.onmessage = (event) => {
         if (event.data === 'new_order') {
             playSound();
-            fetchOrders();
+            fetchOrders(currentFloor);
         } else if (event.data === 'order_completed') {
-            fetchOrders();
+            fetchOrders(currentFloor);
         }
     };
 
     ws.onclose = () => {
-        setTimeout(setupWebSocket, 3000);
+        setTimeout(() => setupWebSocket(currentFloor), 3000);
     };
 }
 
@@ -53,17 +56,18 @@ function playSound() {
     }
 }
 
-async function fetchOrders() {
+async function fetchOrders(currentFloor) {
     try {
-        const res = await fetch('/api/orders/active');
+        const floorParam = currentFloor ? `?floor=${encodeURIComponent(currentFloor)}` : '';
+        const res = await fetch(`/api/orders/active${floorParam}`);
         const orders = await res.json();
-        renderOrders(orders);
+        renderOrders(orders, currentFloor);
     } catch (e) {
         console.error("Orders fetch error:", e);
     }
 }
 
-function renderOrders(orders) {
+function renderOrders(orders, currentFloor) {
     const container = document.getElementById('ordersContainer');
     const countPill = document.getElementById('kitchenOrderCount');
     if (countPill) countPill.textContent = orders.length;
@@ -75,7 +79,7 @@ function renderOrders(orders) {
             <div class="empty-kitchen-state">
                 <div class="empty-icon">☕</div>
                 <h3>Bekleyen Sipariş Bulunmuyor</h3>
-                <p>Mutfak şu an sakin. Yeni siparişler anlık sesli uyarı ile buraya düşecektir.</p>
+                <p>Bu katın mutfağı şu an sakin. Katınızdaki odalardan yeni sipariş geldiğinde anlık sesli uyarı ile buraya düşecektir.</p>
             </div>
         `;
         return;
@@ -105,17 +109,17 @@ function renderOrders(orders) {
             </div>
             ${itemsHtml}
             ${notesHtml}
-            <button class="btn-success btn-complete" onclick="completeOrder(${order.id})">✅ Teslim Edildi İşaretle</button>
+            <button class="btn-success btn-complete" onclick="completeOrder(${order.id}, '${currentFloor}')">✅ Teslim Edildi İşaretle</button>
         `;
         container.appendChild(card);
     });
 }
 
-async function completeOrder(orderId) {
+async function completeOrder(orderId, currentFloor) {
     try {
         const res = await fetch(`/api/orders/${orderId}/complete`, { method: 'POST' });
         if (res.ok) {
-            fetchOrders();
+            fetchOrders(currentFloor);
         }
     } catch (e) {
         console.error("Order completion error:", e);
