@@ -15,13 +15,12 @@ Yerel bilgisayarınızda (proje klasöründe terminal veya PowerShell açarak):
    git commit -m "Makam Servis - Kat Mutfaklari ve Cloud Dagitim Surumu"
    ```
 
-2. **GitHub'da yeni bir repository (depo) açın** (örn: `makam-servis`, Tercihen Private/Gizli).
+2. **GitHub Deponuz:**
+   `https://github.com/paem2donem/makam-servis.git`
 
-3. **Yerel deponuzu GitHub'a bağlayıp push edin:**
+3. **Yerel deponuzu GitHub'a push edin:**
    ```bash
-   git branch -M main
-   git remote add origin https://github.com/KULLANICI_ADINIZ/DEPO_ADINIZ.git
-   git push -u origin main
+   git push origin main
    ```
 
 ---
@@ -76,7 +75,7 @@ Projeniz için `Dockerfile` ve `docker-compose.yml` hazırlandı.
 
 3. **Projeyi GitHub'dan çekin:**
    ```bash
-   git clone https://github.com/KULLANICI_ADINIZ/DEPO_ADINIZ.git makam_servis
+   git clone https://github.com/paem2donem/makam-servis.git makam_servis
    cd makam_servis
    ```
 
