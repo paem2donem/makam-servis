@@ -1,16 +1,26 @@
-version: '3.8'
-
 services:
   makam_servis:
     build: .
     container_name: makam_servis_app
     restart: always
-    ports:
-      - "80:8000"
+    expose:
+      - "8000"
     volumes:
       - ./data:/data
       - ./uploads:/app/uploads
     environment:
       - DATA_DIR=/data
-      # Opsiyonel: Eğer harici PostgreSQL kullanmak isterseniz aşağıdaki satırı açabilirsiniz:
-      # - DATABASE_URL=postgresql://user:pass@host:5432/dbname
+
+  caddy:
+    image: caddy:alpine
+    container_name: makam_servis_caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy_data:/data
+      - ./caddy_config:/config
+    depends_on:
+      - makam_servis

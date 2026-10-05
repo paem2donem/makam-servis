@@ -382,11 +382,15 @@
 
     function generateQRCodes() {
         let host = window.location.hostname;
-        if (host === 'localhost' || host === '127.0.0.1') {
-            host = '{{ server_ip }}';
+        let protocol = window.location.protocol;
+
+        // Mobil cihazlar ve QR okutmalar için HTTPS ve sslip.io alan adını kullan
+        if (host === 'localhost' || host === '127.0.0.1' || host === '152.70.188.116') {
+            host = '152.70.188.116.sslip.io';
+            protocol = 'https:';
         }
-        const port = window.location.port ? `:${window.location.port}` : '';
-        const baseUrl = `${window.location.protocol}//${host}${port}`;
+        const port = (window.location.port && window.location.port !== '80' && window.location.port !== '443') ? `:${window.location.port}` : '';
+        const baseUrl = `${protocol}//${host}${port}`;
 
         document.querySelectorAll('.qr-code-img').forEach(img => {
             const slug = img.dataset.slug;

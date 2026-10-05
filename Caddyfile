@@ -1,0 +1,11 @@
+{
+    email paem2.donem@gmail.com
+}
+
+152.70.188.116.sslip.io {
+    reverse_proxy makam_servis:8000
+}
+
+:80 {
+    reverse_proxy makam_servis:8000
+}
