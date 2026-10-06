@@ -36,7 +36,7 @@ class OrderNotificationService : Service() {
     companion object {
         const val TAG = "OrderNotifService"
         const val FOREGROUND_CHANNEL_ID = "makam_fg_channel"
-        const val ORDER_CHANNEL_ID = "makam_order_channel_loud_v4"
+        const val ORDER_CHANNEL_ID = "makam_order_channel_chime_v5"
         const val FOREGROUND_NOTIF_ID = 1001
 
         const val ACTION_START = "ACTION_START"
@@ -347,23 +347,22 @@ class OrderNotificationService : Service() {
         sendBroadcast(intent)
     }
 
-    private fun playAlarmRingtone() {
-        // 1. ToneGenerator ile donanımsal alarm hoparlöründen ses çal (Sessiz modu deler)
-        try {
-            val toneGen = android.media.ToneGenerator(android.media.AudioManager.STREAM_ALARM, 100)
-            toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 1200)
-        } catch (e: Exception) {
-            Log.e(TAG, "ToneGenerator error", e)
-        }
+    private var activeServiceRingtone: android.media.Ringtone? = null
 
-        // 2. Ringtone ile alarm zil sesini çal
+    private fun playAlarmRingtone() {
         try {
-            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            activeServiceRingtone?.stop()
+            activeServiceRingtone = null
+        } catch (_: Exception) {}
+
+        // Standart Kısa Bildirim Zil Sesi (Notification Chime)
+        try {
+            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             val ringtone = RingtoneManager.getRingtone(applicationContext, soundUri)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 ringtone.audioAttributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build()
             }
@@ -371,6 +370,15 @@ class OrderNotificationService : Service() {
                 ringtone.isLooping = false
             }
             ringtone.play()
+            activeServiceRingtone = ringtone
+
+            // En fazla 2 saniye sonra sesi zorla kes (sürekli çalmasını engeller)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try {
+                    activeServiceRingtone?.stop()
+                    activeServiceRingtone = null
+                } catch (_: Exception) {}
+            }, 2000)
         } catch (e: Exception) {
             Log.e(TAG, "Ringtone error", e)
         }
@@ -384,7 +392,7 @@ class OrderNotificationService : Service() {
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
                 "makamservis:order_alert"
             )
-            wakeLock.acquire(5000)
+            wakeLock.acquire(3000)
         } catch (e: Exception) {
             Log.e(TAG, "Wakelock error", e)
         }
@@ -392,9 +400,10 @@ class OrderNotificationService : Service() {
 
     private fun vibratePhone() {
         try {
-            val pattern = longArrayOf(0, 700, 250, 700, 250, 900)
+            // Kısa, tatlı 2 darbeli bildirim titreşimi (~0.85 sn)
+            val pattern = longArrayOf(0, 350, 150, 350)
             val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
 
@@ -471,14 +480,14 @@ class OrderNotificationService : Service() {
                 "Yeni İkram Siparişleri",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Gelen yeni ikram siparişleri için sesli ve titreşimli acil uyarı"
+                description = "Gelen yeni ikram siparişleri için sesli bildirim ve titreşim"
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 600, 250, 600, 250, 800)
+                vibrationPattern = longArrayOf(0, 350, 150, 350)
                 setSound(
-                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE),
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                         .build()
                 )

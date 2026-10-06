@@ -167,6 +167,7 @@ class MainActivity : ComponentActivity() {
                     availableRooms = availableRoomsState.value,
                     newOrderAlert = newOrderAlertState.value,
                     onDismissNewOrderAlert = {
+                        stopAlertSound()
                         newOrderAlertState.value = null
                         webViewRef?.reload()
                     },
@@ -379,8 +380,19 @@ class MainActivity : ComponentActivity() {
         }.start()
     }
 
+    private var activeInAppRingtone: android.media.Ringtone? = null
+
+    private fun stopAlertSound() {
+        try {
+            activeInAppRingtone?.stop()
+            activeInAppRingtone = null
+        } catch (_: Exception) {}
+    }
+
     private fun playInAppLoudAlert() {
         if (isMutedState.value) return
+        stopAlertSound()
+
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
             @Suppress("DEPRECATION")
@@ -388,37 +400,41 @@ class MainActivity : ComponentActivity() {
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
                 "makamservis:inapp_alert"
             )
-            wl.acquire(5000)
+            wl.acquire(3000)
         } catch (e: Exception) {
             Log.e("MainActivity", "Wakelock error", e)
         }
 
+        // 1. Kısa bildirim zil sesi (Notification Chime)
         try {
-            val toneGen = ToneGenerator(AudioManager.STREAM_ALARM, 100)
-            toneGen.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 1200)
-        } catch (e: Exception) {
-            Log.e("MainActivity", "ToneGenerator error", e)
-        }
-
-        try {
-            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             val ringtone = RingtoneManager.getRingtone(applicationContext, soundUri)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 ringtone.audioAttributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .build()
             }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                ringtone.isLooping = false
+            }
             ringtone.play()
+            activeInAppRingtone = ringtone
+
+            // En fazla 2 saniye sonra sesi zorla kes (sürekli çalmasını engeller)
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                stopAlertSound()
+            }, 2000)
         } catch (e: Exception) {
             Log.e("MainActivity", "Ringtone error", e)
         }
 
+        // 2. Kısa, tatlı 2 darbeli bildirim titreşimi (~0.85 sn)
         try {
-            val pattern = longArrayOf(0, 700, 250, 700, 250, 900)
+            val pattern = longArrayOf(0, 350, 150, 350)
             val audioAttributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -535,11 +551,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        stopAlertSound()
         stopForegroundOrderChecker()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        stopAlertSound()
         stopForegroundOrderChecker()
         try {
             unregisterReceiver(receiver)
