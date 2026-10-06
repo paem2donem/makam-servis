@@ -1,11 +1,32 @@
+let isKitchenMuted = localStorage.getItem('kitchen_muted') === 'true';
+
 document.addEventListener('DOMContentLoaded', () => {
     const appEl = document.getElementById('kitchenApp');
     const currentFloor = appEl ? (appEl.dataset.floor || 'makam') : 'makam';
     
+    updateMuteButtonUI();
     fetchOrders(currentFloor);
     setupWebSocket(currentFloor);
     armAudioPermanently();
 });
+
+function updateMuteButtonUI() {
+    const btn = document.getElementById('btnMuteToggle');
+    if (!btn) return;
+    if (isKitchenMuted) {
+        btn.innerHTML = '🔕 İzinli (Sessiz)';
+        btn.style.background = '#dc2626';
+    } else {
+        btn.innerHTML = '🔊 Nöbette';
+        btn.style.background = '#16a34a';
+    }
+}
+
+function toggleKitchenMute() {
+    isKitchenMuted = !isKitchenMuted;
+    localStorage.setItem('kitchen_muted', isKitchenMuted ? 'true' : 'false');
+    updateMuteButtonUI();
+}
 
 // Pre-arm audio on first touch/click anywhere so browser autoplay never blocks sound
 function armAudioPermanently() {
@@ -46,6 +67,11 @@ function setupWebSocket(currentFloor) {
 }
 
 function playSound() {
+    if (isKitchenMuted) {
+        console.log("Mutfak izinli / sessiz modunda. Ses ve titreşim engellendi.");
+        return;
+    }
+
     // 1. Try HTML5 Audio element
     const audio = document.getElementById('notificationSound');
     if (audio) {

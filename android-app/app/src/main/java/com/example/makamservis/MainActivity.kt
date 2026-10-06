@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
 
     private var webViewRef: WebView? = null
     private var isConnectedState = mutableStateOf(false)
+    private var isMutedState = mutableStateOf(false)
     private var selectedRoleState = mutableStateOf(OrderNotificationService.ROLE_KITCHEN)
     private var selectedFloorState = mutableStateOf("makam")
     private var selectedRoomSlugState = mutableStateOf("")
@@ -68,7 +69,12 @@ class MainActivity : ComponentActivity() {
                 OrderNotificationService.BROADCAST_NEW_ORDER -> {
                     val room = intent.getStringExtra("room_name") ?: "Yeni Sipariş"
                     val items = intent.getStringExtra("items_summary") ?: ""
-                    Toast.makeText(this@MainActivity, "🛎️ $room: $items", Toast.LENGTH_LONG).show()
+                    val isMuted = intent.getBooleanExtra("is_muted", false)
+                    if (isMuted) {
+                        Toast.makeText(this@MainActivity, "🔕 (İzinli Mod) $room yeni sipariş verdi", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this@MainActivity, "🛎️ $room: $items", Toast.LENGTH_LONG).show()
+                    }
                     webViewRef?.reload()
                 }
                 OrderNotificationService.BROADCAST_STATUS_CHANGE -> {
@@ -148,6 +154,8 @@ class MainActivity : ComponentActivity() {
                         showRoomPickerState.value = false
                     },
                     onTestAlert = { testAlert() },
+                    isMuted = isMutedState.value,
+                    onToggleMute = { toggleMute(!isMutedState.value) },
                     onRefresh = { webViewRef?.reload() },
                     onWebViewCreated = { webView ->
                         webViewRef = webView
@@ -193,9 +201,36 @@ class MainActivity : ComponentActivity() {
         selectedFloorState.value = prefs.getString(OrderNotificationService.PREF_FLOOR, "makam") ?: "makam"
         selectedRoomSlugState.value = prefs.getString(OrderNotificationService.PREF_ROOM_SLUG, "") ?: ""
         selectedRoomNameState.value = prefs.getString(OrderNotificationService.PREF_ROOM_NAME, "") ?: ""
+        isMutedState.value = prefs.getBoolean(OrderNotificationService.PREF_IS_MUTED, false)
 
         if (!isConfigured) {
             showRoleDialogState.value = true
+        }
+    }
+
+    private fun toggleMute(muted: Boolean) {
+        isMutedState.value = muted
+        val prefs = getSharedPreferences(OrderNotificationService.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(OrderNotificationService.PREF_IS_MUTED, muted).apply()
+
+        val intent = Intent(this, OrderNotificationService::class.java).apply {
+            action = OrderNotificationService.ACTION_TOGGLE_MUTE
+            putExtra(OrderNotificationService.EXTRA_MUTED, muted)
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error sending mute action to service", e)
+        }
+
+        if (muted) {
+            Toast.makeText(this, "🔕 İzinli Modu Açıldı (Sessiz)", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "🔔 Nöbet Modu Aktif (Sesli)", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -385,6 +420,8 @@ fun AppScreen(
     onApplyRole: (role: String, floor: String, slug: String, name: String) -> Unit,
     onSelectRoom: (RoomItem) -> Unit,
     onTestAlert: () -> Unit,
+    isMuted: Boolean,
+    onToggleMute: () -> Unit,
     onRefresh: () -> Unit,
     onWebViewCreated: (WebView) -> Unit
 ) {
@@ -413,7 +450,7 @@ fun AppScreen(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (isConnected) Color(0xFF10B981) else Color(0xFFF59E0B)
+                                    color = if (isMuted) Color(0xFFEF4444) else if (isConnected) Color(0xFF10B981) else Color(0xFFF59E0B)
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -427,7 +464,7 @@ fun AppScreen(
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = if (isConnected) "Canlı" else "Bağlanıyor",
+                                            text = if (isMuted) "İzinli" else if (isConnected) "Canlı" else "Bağlanıyor",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White
@@ -438,13 +475,13 @@ fun AppScreen(
                         }
                         Text(
                             text = when (role) {
-                                OrderNotificationService.ROLE_KITCHEN -> "Sadece bu katın siparişleri çalar"
+                                OrderNotificationService.ROLE_KITCHEN -> if (isMuted) "🔕 İzinli modu aktif - telefon sessizde" else "Sadece bu katın siparişleri çalar"
                                 OrderNotificationService.ROLE_ROOM -> "Sipariş verme ekranı"
                                 OrderNotificationService.ROLE_ADMIN -> "Sistem yönetim ekranı"
                                 else -> ""
                             },
                             fontSize = 11.sp,
-                            color = Color(0xFF94A3B8)
+                            color = if (role == OrderNotificationService.ROLE_KITCHEN && isMuted) Color(0xFFFCA5A5) else Color(0xFF94A3B8)
                         )
                     }
                 },
@@ -468,6 +505,25 @@ fun AppScreen(
                         }
                     }
 
+                    // Mute / İzinli Toggle Button for Kitchen
+                    if (role == OrderNotificationService.ROLE_KITCHEN) {
+                        Surface(
+                            modifier = Modifier
+                                .padding(horizontal = 3.dp)
+                                .clickable { onToggleMute() },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isMuted) Color(0xFFDC2626) else Color(0xFF16A34A)
+                        ) {
+                            Text(
+                                text = if (isMuted) "🔕 İzinli" else "🔊 Nöbette",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+
                     // Test Sound Button for Kitchen
                     if (role == OrderNotificationService.ROLE_KITCHEN) {
                         IconButton(
@@ -481,7 +537,7 @@ fun AppScreen(
                     // Role / Floor Switch Button
                     Surface(
                         modifier = Modifier
-                            .padding(horizontal = 4.dp)
+                            .padding(horizontal = 3.dp)
                             .clickable { onOpenRoleDialog() },
                         shape = RoundedCornerShape(8.dp),
                         color = Color(0xFF334155)
@@ -509,12 +565,63 @@ fun AppScreen(
             )
         }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            AndroidView(
+            // İzinli / Sessiz Mod Uyarı Bandı
+            if (role == OrderNotificationService.ROLE_KITCHEN && isMuted) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onToggleMute() },
+                    color = Color(0xFFFEF2F2)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "🔕", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "İzinli / Sessiz Modundasınız",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF991B1B)
+                                )
+                                Text(
+                                    text = "Yeni siparişlerde telefon sesli çalmaz.",
+                                    fontSize = 10.5.sp,
+                                    color = Color(0xFFB91C1C)
+                                )
+                            }
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFFDC2626)
+                        ) {
+                            Text(
+                                text = "Sesi Aç ▶",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f)
+            ) {
+                AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
                         layoutParams = ViewGroup.LayoutParams(
@@ -548,6 +655,7 @@ fun AppScreen(
             )
         }
     }
+}
 
     if (showRoleDialog) {
         RoleSelectionDialog(
