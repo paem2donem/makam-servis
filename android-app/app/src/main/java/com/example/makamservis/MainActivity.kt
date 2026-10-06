@@ -66,6 +66,9 @@ class MainActivity : ComponentActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 OrderNotificationService.BROADCAST_NEW_ORDER -> {
+                    val room = intent.getStringExtra("room_name") ?: "Yeni Sipariş"
+                    val items = intent.getStringExtra("items_summary") ?: ""
+                    Toast.makeText(this@MainActivity, "🛎️ $room: $items", Toast.LENGTH_LONG).show()
                     webViewRef?.reload()
                 }
                 OrderNotificationService.BROADCAST_STATUS_CHANGE -> {
@@ -309,11 +312,30 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun testAlert() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                return
+            }
+        }
         val intent = Intent(this, OrderNotificationService::class.java).apply {
             action = OrderNotificationService.ACTION_TEST_NOTIFICATION
         }
-        startService(intent)
-        Toast.makeText(this, "🔔 Ses ve titreşim testi çalındı!", Toast.LENGTH_SHORT).show()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+            Toast.makeText(this, "🔔 Ses ve titreşim testi gönderildi!", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Test alert error", e)
+            Toast.makeText(this, "Hata: ${e.message}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun checkNotificationPermission() {

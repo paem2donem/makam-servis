@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.net.Uri
@@ -17,6 +18,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -24,6 +26,7 @@ import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Collections
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -77,8 +80,7 @@ class OrderNotificationService : Service() {
 
     private var webSocket: WebSocket? = null
     private var currentFloor: String = "makam"
-    private val seenOrderIds = mutableSetOf<Int>()
-    private var isFirstFetch = true
+    private val seenOrderIds = Collections.synchronizedSet(mutableSetOf<Int>())
     private var scheduler: ScheduledExecutorService? = null
     private var isConnected = false
 
@@ -94,11 +96,19 @@ class OrderNotificationService : Service() {
         }
         createNotificationChannels()
         currentFloor = prefs.getString(PREF_FLOOR, "makam") ?: "makam"
-        startForeground(FOREGROUND_NOTIF_ID, createForegroundNotification("Başlatılıyor..."))
+        
+        safeStartForeground(createForegroundNotification("Mutfak Takibi Başlatılıyor..."))
+        
+        Thread {
+            snapshotExistingOrders()
+        }.start()
+
         startPollingAndWebSocket()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        safeStartForeground(createForegroundNotification(if (isConnected) "🟢 Canlı Takip Aktif" else "🟡 Bağlantı Kuruluyor..."))
+
         when (intent?.action) {
             ACTION_STOP -> {
                 stopSelf()
@@ -110,19 +120,64 @@ class OrderNotificationService : Service() {
                 getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
                     .putString(PREF_FLOOR, newFloor)
                     .apply()
-                seenOrderIds.clear()
-                isFirstFetch = true
+                Thread {
+                    snapshotExistingOrders()
+                }.start()
                 restartConnection()
             }
             ACTION_TEST_NOTIFICATION -> {
                 val floorLabel = getFloorLabel(currentFloor)
-                triggerOrderAlert("Test Odası ($floorLabel)", "1x Türk Kahvesi, 1x Su (Ses Testi Başarılı)")
+                triggerOrderAlert("Test Bildirimi ($floorLabel)", "1x Türk Kahvesi, 1x Su (Ses ve Titreşim Başarılı!)")
             }
             else -> {
-                // Default start or restart
+                // Keep running
             }
         }
         return START_STICKY
+    }
+
+    private fun safeStartForeground(notification: android.app.Notification) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceCompat.startForeground(
+                    this,
+                    FOREGROUND_NOTIF_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } else {
+                startForeground(FOREGROUND_NOTIF_ID, notification)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "safeStartForeground error: ${e.message}", e)
+            try {
+                startForeground(FOREGROUND_NOTIF_ID, notification)
+            } catch (e2: Exception) {
+                Log.e(TAG, "Fallback startForeground error: ${e2.message}", e2)
+            }
+        }
+    }
+
+    private fun snapshotExistingOrders() {
+        val url = "http://$SERVER_HOST/api/orders/active?floor=$currentFloor"
+        val request = Request.Builder().url(url).build()
+        try {
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                val body = response.body?.string() ?: ""
+                val jsonArray = JSONArray(body)
+                synchronized(seenOrderIds) {
+                    seenOrderIds.clear()
+                    for (i in 0 until jsonArray.length()) {
+                        val order = jsonArray.getJSONObject(i)
+                        seenOrderIds.add(order.getInt("id"))
+                    }
+                }
+                Log.d(TAG, "Snapshot success: ${seenOrderIds.size} existing orders cached for floor $currentFloor")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error snapshotting orders: ${e.message}")
+        }
     }
 
     private fun startPollingAndWebSocket() {
@@ -130,14 +185,14 @@ class OrderNotificationService : Service() {
 
         scheduler?.shutdownNow()
         scheduler = Executors.newSingleThreadScheduledExecutor()
-        // Poll every 8 seconds as robust backup
+        // Poll every 6 seconds as a guaranteed backup in case of network drops
         scheduler?.scheduleWithFixedDelay({
             try {
                 fetchAndCheckOrders()
             } catch (e: Exception) {
                 Log.e(TAG, "Error polling orders", e)
             }
-        }, 3, 8, TimeUnit.SECONDS)
+        }, 3, 6, TimeUnit.SECONDS)
     }
 
     private fun restartConnection() {
@@ -165,7 +220,7 @@ class OrderNotificationService : Service() {
             }
 
             override fun onMessage(ws: WebSocket, text: String) {
-                Log.d(TAG, "WebSocket message: $text")
+                Log.d(TAG, "WebSocket message received: $text")
                 if (text == "new_order") {
                     fetchAndCheckOrders()
                 }
@@ -181,10 +236,10 @@ class OrderNotificationService : Service() {
                 isConnected = false
                 broadcastStatus(false)
                 updateForegroundNotification()
-                // Reconnect after 5 seconds
+                // Reconnect after 4 seconds
                 scheduler?.schedule({
                     connectWebSocket()
-                }, 5, TimeUnit.SECONDS)
+                }, 4, TimeUnit.SECONDS)
             }
         })
     }
@@ -207,59 +262,82 @@ class OrderNotificationService : Service() {
             val body = response.body?.string() ?: return
             val jsonArray = JSONArray(body)
 
-            val currentOrderIds = mutableSetOf<Int>()
             for (i in 0 until jsonArray.length()) {
                 val order = jsonArray.getJSONObject(i)
                 val orderId = order.getInt("id")
-                currentOrderIds.add(orderId)
 
                 val orderFloor = order.optString("floor", "makam")
                 if (currentFloor != "all" && orderFloor != currentFloor) {
                     continue
                 }
 
-                // If this is a new order we haven't alerted for
-                if (!seenOrderIds.contains(orderId)) {
-                    seenOrderIds.add(orderId)
-                    if (!isFirstFetch) {
-                        val roomName = order.optString("room_name", "Oda")
-                        val itemsArray = order.optJSONArray("items") ?: JSONArray()
-                        val itemsSummary = buildString {
-                            for (j in 0 until itemsArray.length()) {
-                                val item = itemsArray.getJSONObject(j)
-                                val q = item.optInt("quantity", 1)
-                                val pName = item.optString("product_name", "Ürün")
-                                val notes = item.optString("notes", "")
-                                if (j > 0) append(", ")
-                                append("${q}x $pName")
-                                if (notes.isNotBlank()) append(" ($notes)")
-                            }
-                        }
-                        triggerOrderAlert(roomName, itemsSummary)
+                val isBrandNew: Boolean
+                synchronized(seenOrderIds) {
+                    if (!seenOrderIds.contains(orderId)) {
+                        seenOrderIds.add(orderId)
+                        isBrandNew = true
+                    } else {
+                        isBrandNew = false
                     }
                 }
+
+                if (isBrandNew) {
+                    val roomName = order.optString("room_name", "Oda")
+                    val itemsArray = order.optJSONArray("items") ?: JSONArray()
+                    val itemsSummary = buildString {
+                        for (j in 0 until itemsArray.length()) {
+                            val item = itemsArray.getJSONObject(j)
+                            val q = item.optInt("quantity", 1)
+                            val pName = item.optString("product_name", "Ürün")
+                            val notes = item.optString("notes", "")
+                            if (j > 0) append(", ")
+                            append("${q}x $pName")
+                            if (notes.isNotBlank()) append(" ($notes)")
+                        }
+                    }
+                    Log.d(TAG, ">>> YENI SIPARIS BULUNDU: #$orderId - $roomName: $itemsSummary")
+                    triggerOrderAlert(roomName, itemsSummary)
+                }
             }
-            isFirstFetch = false
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch orders", e)
+            Log.e(TAG, "Failed to fetch orders: ${e.message}")
         }
     }
 
     private fun triggerOrderAlert(roomName: String, itemsSummary: String) {
-        // 1. Wake screen
+        // 1. Ekranı Aç (Kilitli veya kapalıysa uyandır)
         wakeUpScreen()
 
-        // 2. Vibrate
+        // 2. Güçlü Titreşim Ver
         vibratePhone()
 
-        // 3. Sound & Notification
+        // 3. Doğrudan Zil Sesini Çal (Hoparlörden ses çıkışı garantisi)
+        playAlarmRingtone()
+
+        // 4. Durum Çubuğuna Yüksek Öncelikli Pop-up Bildirim Çıkar
         showOrderNotification(roomName, itemsSummary)
 
-        // 4. Broadcast to Activity
+        // 5. Activity'e anlık yayın gönder (ekran açıksa Toast & Yenileme için)
         val intent = Intent(BROADCAST_NEW_ORDER).apply {
+            putExtra("room_name", roomName)
+            putExtra("items_summary", itemsSummary)
             setPackage(packageName)
         }
         sendBroadcast(intent)
+    }
+
+    private fun playAlarmRingtone() {
+        try {
+            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            val ringtone = RingtoneManager.getRingtone(applicationContext, soundUri)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                ringtone.isLooping = false
+            }
+            ringtone.play()
+        } catch (e: Exception) {
+            Log.e(TAG, "Ringtone error", e)
+        }
     }
 
     private fun wakeUpScreen() {
@@ -337,7 +415,7 @@ class OrderNotificationService : Service() {
                 "Makam Servis Durumu",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Uygulamanın arka planda aktif kaldığını gösterir"
+                description = "Uygulamanın arka planda canlı kaldığını gösterir"
                 setShowBadge(false)
             }
             manager.createNotificationChannel(fgChannel)
@@ -377,7 +455,7 @@ class OrderNotificationService : Service() {
         return NotificationCompat.Builder(this, FOREGROUND_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("Makam Servis Mutfak")
-            .setContentText(if (isConnected) "🟢 $floorLabel (Canlı)" else "🟡 $floorLabel (Bağlanıyor...)")
+            .setContentText(if (isConnected) "🟢 $floorLabel ($statusText)" else "🟡 $floorLabel ($statusText)")
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
