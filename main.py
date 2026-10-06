@@ -127,6 +127,11 @@ def check_schema():
         except Exception:
             pass
         try:
+            conn.execute(text("ALTER TABLE rooms ADD COLUMN display_order INTEGER DEFAULT 0"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
             conn.execute(text("ALTER TABLE orders ADD COLUMN floor VARCHAR DEFAULT 'makam'"))
             conn.commit()
         except Exception:
@@ -216,7 +221,7 @@ def startup_event():
 async def read_root(request: Request, room: str = None, db: Session = Depends(get_db)):
     if room:
         return await show_room_page(request, room, db)
-    rooms = db.query(models.Room).all()
+    rooms = db.query(models.Room).order_by(models.Room.display_order.asc(), models.Room.id.asc()).all()
     return templates.TemplateResponse(request=request, name="select_room.html", context={"rooms": rooms, "floors": FLOORS})
 
 @app.get("/login", response_class=HTMLResponse)
@@ -259,7 +264,7 @@ async def admin_panel(request: Request, db: Session = Depends(get_db)):
     if not is_admin_authenticated(request):
         return RedirectResponse(url="/login", status_code=303)
     products = db.query(models.Product).order_by(models.Product.display_order.asc(), models.Product.id.asc()).all()
-    rooms = db.query(models.Room).all()
+    rooms = db.query(models.Room).order_by(models.Room.display_order.asc(), models.Room.id.asc()).all()
     server_ip = get_local_ip()
     return templates.TemplateResponse(request=request, name="admin.html", context={
         "products": products, 
@@ -341,7 +346,9 @@ async def create_room(
     if exists:
         return {"error": f"'{clean_slug}' linki zaten kullanımda!"}
         
-    new_room = models.Room(name=name.strip(), slug=clean_slug, floor=floor)
+    # Set display_order to end of list
+    max_order = db.query(func.max(models.Room.display_order)).scalar() or 0
+    new_room = models.Room(name=name.strip(), slug=clean_slug, floor=floor, display_order=max_order + 1)
     db.add(new_room)
     db.commit()
     return {"status": "success"}
@@ -358,6 +365,19 @@ async def delete_room(
     if not room:
         return {"error": "Oda bulunamadı"}
     db.delete(room)
+    db.commit()
+    return {"status": "success"}
+
+@app.post("/api/rooms/reorder")
+async def reorder_rooms(request: Request, db: Session = Depends(get_db)):
+    if not is_admin_authenticated(request):
+        return {"error": "Yetkisiz erişim"}
+    data = await request.json()
+    order_ids = data.get("order", [])
+    for index, rid in enumerate(order_ids):
+        room = db.query(models.Room).filter(models.Room.id == rid).first()
+        if room:
+            room.display_order = index
     db.commit()
     return {"status": "success"}
 

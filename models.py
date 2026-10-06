@@ -9,6 +9,7 @@ class Room(Base):
     name = Column(String, unique=True, index=True)
     slug = Column(String, unique=True, index=True)
     floor = Column(String, default="makam", index=True) # 'makam', 'kat-3', 'kat-4', 'kat-5', 'kat-6'
+    display_order = Column(Integer, default=0)
 
 class Product(Base):
     __tablename__ = "products"

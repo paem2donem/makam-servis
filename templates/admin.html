@@ -13,6 +13,31 @@
     box-shadow: 0 8px 20px rgba(0,0,0,0.06);
 }
 
+/* Sürükle - Bırak (Drag & Drop) Efektleri */
+.drag-room-card {
+    cursor: grab;
+    user-select: none;
+    transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s ease, opacity 0.18s ease;
+}
+.drag-room-card:active {
+    cursor: grabbing;
+}
+.drag-room-card.dragging {
+    opacity: 0.35 !important;
+    transform: scale(0.96) !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+}
+.drag-handle-grip {
+    cursor: grab;
+    user-select: none;
+    color: #94a3b8;
+    font-size: 1.15rem;
+    transition: color 0.15s ease;
+}
+.drag-handle-grip:hover {
+    color: #3b82f6;
+}
+
 @media print {
     @page {
         size: A4 portrait;
@@ -482,11 +507,16 @@
 
             <!-- 2. BÖLÜM: ODALARIN QR KODLARI VE KAT ATAMALARI -->
             <div id="roomsQrSection" style="margin-top: 35px;">
-                <h3 class="print-section-title" style="font-size: 1.1rem; color: #1e293b; display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                    <span>🚪</span> <span>Oda QR Kodları (Makam & Ofisler)</span>
-                </h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                    <h3 class="print-section-title" style="font-size: 1.1rem; color: #1e293b; display: flex; align-items: center; gap: 8px; margin: 0;">
+                        <span>🚪</span> <span>Oda QR Kodları (Makam & Ofisler)</span>
+                    </h3>
+                    <span class="drag-hint-badge" style="background: #e2e8f0; color: #334155; font-size: 0.78rem; padding: 4px 12px; border-radius: 20px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>💡</span> <span>Sürükle & Bırak ile Sıralayın</span>
+                    </span>
+                </div>
 
-                <div class="rooms-cards-grid" style="margin-top: 15px;">
+                <div class="rooms-cards-grid" id="sortableRoomsGrid" style="margin-top: 15px;">
                     {% for r in rooms %}
                     {% if r.floor == 'makam' %}
                         {% set border_col = '#312e81' %}
@@ -540,9 +570,10 @@
                         {% set floor_label = '6. Kat' %}
                     {% endif %}
 
-                    <div class="room-manage-card qr-printable-card theme-{{ r.floor }}" style="border: 2px solid {{ border_col }}; background: {{ bg_col }};">
+                    <div class="room-manage-card qr-printable-card theme-{{ r.floor }} drag-room-card" draggable="true" data-id="{{ r.id }}" style="border: 2px solid {{ border_col }}; background: {{ bg_col }};">
                         <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span class="drag-handle-grip" title="Sıralamak için sürükleyin">⋮⋮</span>
                                 <div class="room-icon-badge" style="background: {{ badge_bg }}; color: {{ badge_col }};">{{ icon_char }}</div>
                                 <div>
                                     <a href="/{{ r.slug }}" target="_blank" class="room-current-title" style="color: {{ title_col }}; font-weight: 800; text-decoration: none;">{{ r.name }}</a>
@@ -964,6 +995,65 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order: orderIds })
         });
+    }
+
+    // ODA & QR KODLARI SÜRÜKLE - BIRAK SIRALAMA
+    let draggedRoom = null;
+    document.addEventListener('DOMContentLoaded', () => {
+        const grid = document.getElementById('sortableRoomsGrid');
+        if (!grid) return;
+
+        grid.addEventListener('dragstart', (e) => {
+            const card = e.target.closest('.drag-room-card');
+            if (!card) return;
+
+            // Form kontrol elemanları ve butonlarda sürüklemeyi engelle
+            if (['INPUT', 'SELECT', 'BUTTON', 'SUMMARY', 'TEXTAREA'].includes(e.target.tagName)) {
+                e.preventDefault();
+                return;
+            }
+
+            draggedRoom = card;
+            card.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', card.dataset.id);
+        });
+
+        grid.addEventListener('dragend', () => {
+            document.querySelectorAll('.drag-room-card').forEach(c => c.classList.remove('dragging'));
+            draggedRoom = null;
+            saveRoomsOrder();
+        });
+
+        grid.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const targetCard = e.target.closest('.drag-room-card');
+            if (!targetCard || targetCard === draggedRoom) return;
+
+            const rect = targetCard.getBoundingClientRect();
+            const isAfter = (e.clientX - rect.left) / rect.width > 0.5;
+            if (isAfter) {
+                targetCard.after(draggedRoom);
+            } else {
+                targetCard.before(draggedRoom);
+            }
+        });
+    });
+
+    async function saveRoomsOrder() {
+        const cards = [...document.querySelectorAll('#sortableRoomsGrid .drag-room-card')];
+        const orderIds = cards.map(c => parseInt(c.dataset.id));
+
+        try {
+            await fetch('/api/rooms/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ order: orderIds })
+            });
+        } catch (err) {
+            console.error('Oda sıralaması kaydedilemedi:', err);
+        }
     }
 </script>
 {% endblock %}
