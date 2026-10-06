@@ -190,7 +190,11 @@ class MainActivity : ComponentActivity() {
                     onRefresh = { webViewRef?.reload() },
                     onWebViewCreated = { webView ->
                         webViewRef = webView
+                        webView.addJavascriptInterface(KitchenWebAppInterface(this@MainActivity), "MakamAndroid")
                         loadInitialUrl()
+                    },
+                    onUrlLoaded = { url ->
+                        syncFloorFromUrl(url)
                     }
                 )
             }
@@ -265,6 +269,57 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    fun syncFloorFromUrl(url: String?) {
+        if (url.isNullOrBlank()) return
+        try {
+            val uri = android.net.Uri.parse(url)
+            val path = uri.path?.removePrefix("/") ?: ""
+            if (path.startsWith("mutfak/")) {
+                val floorKey = path.removePrefix("mutfak/").trimEnd('/')
+                if (floorKey.isNotBlank() && (selectedRoleState.value != OrderNotificationService.ROLE_KITCHEN || selectedFloorState.value != floorKey)) {
+                    Log.d("MainActivity", "Auto-syncing floor from WebView URL: $floorKey")
+                    selectedRoleState.value = OrderNotificationService.ROLE_KITCHEN
+                    selectedFloorState.value = floorKey
+                    val prefs = getSharedPreferences(OrderNotificationService.PREFS_NAME, Context.MODE_PRIVATE)
+                    prefs.edit()
+                        .putString(OrderNotificationService.PREF_ROLE, OrderNotificationService.ROLE_KITCHEN)
+                        .putString(OrderNotificationService.PREF_FLOOR, floorKey)
+                        .putBoolean(OrderNotificationService.PREF_CONFIGURED, true)
+                        .apply()
+                    syncServiceWithRole()
+                }
+            } else if (path == "admin") {
+                if (selectedRoleState.value != OrderNotificationService.ROLE_ADMIN) {
+                    selectedRoleState.value = OrderNotificationService.ROLE_ADMIN
+                    val prefs = getSharedPreferences(OrderNotificationService.PREFS_NAME, Context.MODE_PRIVATE)
+                    prefs.edit()
+                        .putString(OrderNotificationService.PREF_ROLE, OrderNotificationService.ROLE_ADMIN)
+                        .putBoolean(OrderNotificationService.PREF_CONFIGURED, true)
+                        .apply()
+                    syncServiceWithRole()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "syncFloorFromUrl error", e)
+        }
+    }
+
+    class KitchenWebAppInterface(private val activity: MainActivity) {
+        @android.webkit.JavascriptInterface
+        fun openRoleDialog() {
+            activity.runOnUiThread {
+                activity.showRoleDialogState.value = true
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun setFloor(floorKey: String) {
+            activity.runOnUiThread {
+                activity.applyRoleConfiguration(OrderNotificationService.ROLE_KITCHEN, floorKey, "", "")
+            }
+        }
+    }
+
     private fun loadInitialUrl() {
         val role = selectedRoleState.value
         val floor = selectedFloorState.value
@@ -279,7 +334,10 @@ class MainActivity : ComponentActivity() {
             OrderNotificationService.ROLE_ADMIN -> "http://${OrderNotificationService.SERVER_HOST}/admin"
             else -> "http://${OrderNotificationService.SERVER_HOST}/mutfak/$floor"
         }
-        webViewRef?.loadUrl(url)
+        runOnUiThread {
+            webViewRef?.stopLoading()
+            webViewRef?.loadUrl(url)
+        }
     }
 
     private fun applyRoleConfiguration(role: String, floor: String, slug: String, name: String) {
@@ -460,6 +518,23 @@ class MainActivity : ComponentActivity() {
         stopForegroundOrderChecker()
         if (selectedRoleState.value != OrderNotificationService.ROLE_KITCHEN) return
 
+        Thread {
+            try {
+                val floor = selectedFloorState.value
+                val url = "http://${OrderNotificationService.SERVER_HOST}/api/orders/active?floor=$floor"
+                val request = Request.Builder().url(url).build()
+                val response = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).build().newCall(request).execute()
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: ""
+                    val jsonArray = JSONArray(body)
+                    for (i in 0 until jsonArray.length()) {
+                        val order = jsonArray.getJSONObject(i)
+                        foregroundSeenOrderIds.add(order.getInt("id"))
+                    }
+                }
+            } catch (_: Exception) {}
+        }.start()
+
         activityScheduler = Executors.newSingleThreadScheduledExecutor()
         activityScheduler?.scheduleWithFixedDelay({
             try {
@@ -491,7 +566,7 @@ class MainActivity : ComponentActivity() {
             } catch (t: Throwable) {
                 Log.d("MainActivity", "Foreground check: ${t.message}")
             }
-        }, 1, 2500, TimeUnit.MILLISECONDS)
+        }, 2, 2500, TimeUnit.MILLISECONDS)
     }
 
     private fun stopForegroundOrderChecker() {
@@ -614,6 +689,7 @@ fun AppScreen(
     isMuted: Boolean,
     onToggleMute: () -> Unit,
     onRefresh: () -> Unit,
+    onUrlLoaded: (String) -> Unit,
     onWebViewCreated: (WebView) -> Unit
 ) {
     Scaffold(
@@ -777,7 +853,7 @@ fun AppScreen(
                             javaScriptEnabled = true
                             domStorageEnabled = true
                             databaseEnabled = true
-                            cacheMode = WebSettings.LOAD_DEFAULT
+                            cacheMode = WebSettings.LOAD_NO_CACHE
                             useWideViewPort = true
                             loadWithOverviewMode = true
                             builtInZoomControls = true
@@ -785,11 +861,29 @@ fun AppScreen(
                             mediaPlaybackRequiresUserGesture = false
                         }
                         webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                                val u = request?.url?.toString()
+                                if (u != null) {
+                                    onUrlLoaded(u)
+                                    view?.loadUrl(u)
+                                }
+                                return true
+                            }
+
+                            @Deprecated("Deprecated in Java")
                             override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
                                 if (url != null) {
+                                    onUrlLoaded(url)
                                     view?.loadUrl(url)
                                 }
                                 return true
+                            }
+
+                            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                                super.onPageStarted(view, url, favicon)
+                                if (url != null) {
+                                    onUrlLoaded(url)
+                                }
                             }
                         }
                         webChromeClient = WebChromeClient()
@@ -891,10 +985,10 @@ fun RoleSelectionDialog(
     onDismiss: () -> Unit,
     onApply: (role: String, floor: String, slug: String, name: String) -> Unit
 ) {
-    var selectedRole by remember { mutableStateOf(initialRole) }
-    var selectedFloor by remember { mutableStateOf(initialFloor) }
-    var selectedSlug by remember { mutableStateOf(initialSlug) }
-    var selectedName by remember { mutableStateOf(initialName) }
+    var selectedRole by remember(initialRole) { mutableStateOf(initialRole) }
+    var selectedFloor by remember(initialFloor) { mutableStateOf(initialFloor) }
+    var selectedSlug by remember(initialSlug) { mutableStateOf(initialSlug) }
+    var selectedName by remember(initialName) { mutableStateOf(initialName) }
 
     val floorOptions = listOf(
         "makam" to "⭐ Makam Katı Mutfağı",

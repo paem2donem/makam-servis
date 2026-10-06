@@ -252,7 +252,7 @@ async def download_apk():
         return FileResponse(
             apk_path, 
             media_type="application/vnd.android.package-archive", 
-            filename="MakamServis-v1.0.8.apk",
+            filename="MakamServis-v1.0.9.apk",
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
         )
     raise HTTPException(status_code=404, detail="Uygulama paketi henüz hazırlanmadı")
@@ -260,18 +260,28 @@ async def download_apk():
 
 @app.get("/mutfak", response_class=HTMLResponse)
 async def kitchen_selector(request: Request):
-    return templates.TemplateResponse(request=request, name="kitchen_select.html", context={"floors": FLOORS})
+    return templates.TemplateResponse(
+        request=request, 
+        name="kitchen_select.html", 
+        context={"floors": FLOORS},
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
 
 @app.get("/mutfak/{floor}", response_class=HTMLResponse)
 async def kitchen_dashboard(request: Request, floor: str):
     if floor not in FLOORS and floor != "all":
         floor = "makam"
     floor_name = FLOORS.get(floor, "Tüm Mutfaklar" if floor == "all" else "Mutfak Paneli")
-    return templates.TemplateResponse(request=request, name="kitchen.html", context={
-        "floor": floor,
-        "floor_name": floor_name,
-        "floors": FLOORS
-    })
+    return templates.TemplateResponse(
+        request=request, 
+        name="kitchen.html", 
+        context={
+            "floor": floor,
+            "floor_name": floor_name,
+            "floors": FLOORS
+        },
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_panel(request: Request, db: Session = Depends(get_db)):

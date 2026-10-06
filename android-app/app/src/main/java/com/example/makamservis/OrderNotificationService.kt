@@ -148,14 +148,17 @@ class OrderNotificationService : Service() {
             }
             ACTION_CHANGE_FLOOR -> {
                 val newFloor = intent.getStringExtra(EXTRA_FLOOR) ?: "makam"
+                val floorChanged = currentFloor != newFloor
                 currentFloor = newFloor
-                seenOrderIds.clear()
                 getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
                     .putString(PREF_FLOOR, newFloor)
                     .apply()
-                Thread {
-                    snapshotExistingOrders()
-                }.start()
+                if (floorChanged) {
+                    seenOrderIds.clear()
+                    Thread {
+                        snapshotExistingOrdersQuietly()
+                    }.start()
+                }
                 restartConnection()
             }
             ACTION_TEST_NOTIFICATION -> {
@@ -192,11 +195,31 @@ class OrderNotificationService : Service() {
     }
 
     private fun snapshotExistingOrders() {
-        // Bekleyen siparişleri sessizce yutmak yerine anında denetle ve uyarıyı çal
         try {
             fetchAndCheckOrders()
         } catch (e: Exception) {
             Log.e(TAG, "Error checking orders on snapshot: ${e.message}")
+        }
+    }
+
+    private fun snapshotExistingOrdersQuietly() {
+        try {
+            val url = "http://$SERVER_HOST/api/orders/active?floor=$currentFloor"
+            val request = Request.Builder().url(url).build()
+            val response = httpClient.newCall(request).execute()
+            if (response.isSuccessful) {
+                val body = response.body?.string() ?: ""
+                val jsonArray = JSONArray(body)
+                synchronized(seenOrderIds) {
+                    for (i in 0 until jsonArray.length()) {
+                        val order = jsonArray.getJSONObject(i)
+                        seenOrderIds.add(order.getInt("id"))
+                    }
+                }
+                Log.d(TAG, "Quiet snapshot completed for $currentFloor with ${seenOrderIds.size} orders.")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error snapshotting existing orders quietly: ${e.message}")
         }
     }
 
@@ -217,22 +240,26 @@ class OrderNotificationService : Service() {
 
     private fun restartConnection() {
         try {
-            webSocket?.close(1000, "Floor change")
+            val oldWs = webSocket
+            webSocket = null
+            oldWs?.cancel()
         } catch (_: Exception) {}
         connectWebSocket()
         updateForegroundNotification()
     }
 
     private fun connectWebSocket() {
-        val url = if (currentFloor == "all") {
+        val targetFloor = currentFloor
+        val url = if (targetFloor == "all") {
             "ws://$SERVER_HOST/ws/mutfak"
         } else {
-            "ws://$SERVER_HOST/ws/mutfak/$currentFloor"
+            "ws://$SERVER_HOST/ws/mutfak/$targetFloor"
         }
 
         val request = Request.Builder().url(url).build()
-        webSocket = client.newWebSocket(request, object : WebSocketListener() {
+        val listener = object : WebSocketListener() {
             override fun onOpen(ws: WebSocket, response: Response) {
+                if (ws != webSocket) return
                 Log.d(TAG, "WebSocket Connected to $url")
                 isConnected = true
                 broadcastStatus(true)
@@ -240,6 +267,7 @@ class OrderNotificationService : Service() {
             }
 
             override fun onMessage(ws: WebSocket, text: String) {
+                if (ws != webSocket) return
                 Log.d(TAG, "WebSocket message received: $text")
                 if (text == "new_order") {
                     fetchAndCheckOrders()
@@ -247,21 +275,24 @@ class OrderNotificationService : Service() {
             }
 
             override fun onClosing(ws: WebSocket, code: Int, reason: String) {
+                if (ws != webSocket) return
                 isConnected = false
                 broadcastStatus(false)
             }
 
             override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
+                if (ws != webSocket) return
                 Log.e(TAG, "WebSocket Failure: ${t.message}")
                 isConnected = false
                 broadcastStatus(false)
                 updateForegroundNotification()
-                // Reconnect after 4 seconds
+                // Reconnect after 3 seconds
                 scheduler?.schedule({
                     connectWebSocket()
-                }, 4, TimeUnit.SECONDS)
+                }, 3, TimeUnit.SECONDS)
             }
-        })
+        }
+        webSocket = client.newWebSocket(request, listener)
     }
 
     private fun broadcastStatus(connected: Boolean) {
