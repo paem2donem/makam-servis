@@ -6,13 +6,13 @@ plugins {
 
 android {
     namespace = "com.example.makamservis"
-    compileSdk = 36
+    compileSdk = 35
     defaultConfig {
-        applicationId = "com.example.makamservis"
+        applicationId = "com.makamservis.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
     }
 
     signingConfigs {
@@ -21,6 +21,8 @@ android {
             storePassword = "makamservispass"
             keyAlias = "makamservis"
             keyPassword = "makamservispass"
+            enableV1Signing = true
+            enableV2Signing = true
         }
     }
 
@@ -90,9 +92,4 @@ dependencies {
   androidTestImplementation(libs.androidx.test.ext.junit)
   androidTestImplementation(libs.androidx.test.runner)
   androidTestImplementation(libs.androidx.test.espresso.core)
-
-  // Navigation
-  implementation(libs.androidx.navigation3.ui)
-  implementation(libs.androidx.navigation3.runtime)
-  implementation(libs.androidx.lifecycle.viewmodel.navigation3)
 }
