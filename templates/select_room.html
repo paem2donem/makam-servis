@@ -11,6 +11,13 @@
             <p style="color: #64748b; font-size: 0.9rem;">Lütfen sipariş vermek istediğiniz odayı veya makamı seçin</p>
         </div>
 
+        <!-- Hızlı Oda Arama -->
+        <div style="margin-bottom: 22px;">
+            <input type="text" id="roomSearchInput" placeholder="🔍 Oda veya Büro Ara... (Örn: J Büro, Toplantı, Makam)" 
+                   style="width: 100%; box-sizing: border-box; padding: 12px 16px; border-radius: 12px; border: 1.5px solid #cbd5e1; font-size: 0.95rem; outline: none; background: #f8fafc;"
+                   oninput="filterRooms(this.value)">
+        </div>
+
         {% if error %}
         <div class="error-alert" style="background: #fee2e2; border-left: 4px solid #ef4444; color: #b91c1c; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 0.85rem;">
             {{ error }}
@@ -78,4 +85,18 @@
         </div>
     </div>
 </div>
+
+<script>
+function filterRooms(q) {
+    q = (q || '').trim().toLowerCase();
+    document.querySelectorAll('.btn-room-select').forEach(el => {
+        const text = el.textContent.toLowerCase();
+        el.style.display = text.includes(q) ? 'flex' : 'none';
+    });
+    document.querySelectorAll('.floor-group-section').forEach(sec => {
+        const visibleRooms = sec.querySelectorAll('.btn-room-select:not([style*="display: none"])');
+        sec.style.display = visibleRooms.length > 0 ? 'block' : 'none';
+    });
+}
+</script>
 {% endblock %}

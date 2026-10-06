@@ -4,8 +4,14 @@
 
 {% block content %}
 <header class="app-header">
-    <div class="header-content">
-        <h1>{{ room.name }}</h1>
+    <div class="header-content" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.25rem;">🚪</span>
+            <h1 style="margin: 0; font-size: 1.2rem;">{{ room.name }}</h1>
+        </div>
+        <a href="/" style="font-size: 0.78rem; color: #2563eb; text-decoration: none; background: #eff6ff; padding: 5px 11px; border-radius: 8px; font-weight: 600; border: 1px solid #bfdbfe; display: inline-flex; align-items: center; gap: 4px;" title="Başka bir oda seç">
+            <span>🔄 Oda Değiştir</span>
+        </a>
     </div>
 </header>
 

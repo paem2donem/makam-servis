@@ -449,6 +449,18 @@ async def get_active_orders(floor: str = None, db: Session = Depends(get_db)):
         })
     return result
 
+@app.get("/api/floors")
+async def get_floors():
+    return FLOORS
+
+@app.get("/api/rooms")
+async def get_rooms(floor: str = None, db: Session = Depends(get_db)):
+    query = db.query(models.Room)
+    if floor and floor != "all":
+        query = query.filter(models.Room.floor == floor)
+    rooms = query.order_by(models.Room.display_order.asc(), models.Room.id.asc()).all()
+    return [{"id": r.id, "name": r.name, "slug": r.slug, "floor": r.floor or "makam"} for r in rooms]
+
 @app.post("/api/orders/{order_id}/complete")
 async def complete_order(order_id: int, db: Session = Depends(get_db)):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()

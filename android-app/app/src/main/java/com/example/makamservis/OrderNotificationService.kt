@@ -48,7 +48,27 @@ class OrderNotificationService : Service() {
 
         const val SERVER_HOST = "152.70.188.116"
         const val PREFS_NAME = "makam_prefs"
+        const val PREF_ROLE = "selected_role"
         const val PREF_FLOOR = "selected_floor"
+        const val PREF_ROOM_SLUG = "selected_room_slug"
+        const val PREF_ROOM_NAME = "selected_room_name"
+        const val PREF_CONFIGURED = "is_role_configured"
+
+        const val ROLE_KITCHEN = "kitchen"
+        const val ROLE_ROOM = "room"
+        const val ROLE_ADMIN = "admin"
+
+        fun getFloorLabel(floorKey: String): String {
+            return when (floorKey) {
+                "makam" -> "⭐ Makam Katı Mutfağı"
+                "kat-3" -> "🏢 3. Kat Mutfağı"
+                "kat-4" -> "🏢 4. Kat Mutfağı"
+                "kat-5" -> "🏢 5. Kat Mutfağı"
+                "kat-6" -> "🏢 6. Kat Mutfağı"
+                "all" -> "🌐 Tüm Mutfaklar (Merkezi)"
+                else -> "$floorKey Mutfağı"
+            }
+        }
     }
 
     private val client = OkHttpClient.Builder()
@@ -66,12 +86,15 @@ class OrderNotificationService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannels()
-        startForeground(FOREGROUND_NOTIF_ID, createForegroundNotification("Başlatılıyor..."))
-
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val role = prefs.getString(PREF_ROLE, ROLE_KITCHEN) ?: ROLE_KITCHEN
+        if (role != ROLE_KITCHEN) {
+            stopSelf()
+            return
+        }
+        createNotificationChannels()
         currentFloor = prefs.getString(PREF_FLOOR, "makam") ?: "makam"
-
+        startForeground(FOREGROUND_NOTIF_ID, createForegroundNotification("Başlatılıyor..."))
         startPollingAndWebSocket()
     }
 
@@ -83,18 +106,17 @@ class OrderNotificationService : Service() {
             }
             ACTION_CHANGE_FLOOR -> {
                 val newFloor = intent.getStringExtra(EXTRA_FLOOR) ?: "makam"
-                if (newFloor != currentFloor) {
-                    currentFloor = newFloor
-                    getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
-                        .putString(PREF_FLOOR, newFloor)
-                        .apply()
-                    seenOrderIds.clear()
-                    isFirstFetch = true
-                    restartConnection()
-                }
+                currentFloor = newFloor
+                getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+                    .putString(PREF_FLOOR, newFloor)
+                    .apply()
+                seenOrderIds.clear()
+                isFirstFetch = true
+                restartConnection()
             }
             ACTION_TEST_NOTIFICATION -> {
-                triggerOrderAlert("Test Odası", "1x Türk Kahvesi, 1x Su (Test Bildirimi)")
+                val floorLabel = getFloorLabel(currentFloor)
+                triggerOrderAlert("Test Odası ($floorLabel)", "1x Türk Kahvesi, 1x Su (Ses Testi Başarılı)")
             }
             else -> {
                 // Default start or restart
@@ -190,6 +212,11 @@ class OrderNotificationService : Service() {
                 val order = jsonArray.getJSONObject(i)
                 val orderId = order.getInt("id")
                 currentOrderIds.add(orderId)
+
+                val orderFloor = order.optString("floor", "makam")
+                if (currentFloor != "all" && orderFloor != currentFloor) {
+                    continue
+                }
 
                 // If this is a new order we haven't alerted for
                 if (!seenOrderIds.contains(orderId)) {
@@ -345,19 +372,12 @@ class OrderNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val floorLabel = when (currentFloor) {
-            "makam" -> "⭐ Makam Katı"
-            "kat-3" -> "🏢 3. Kat"
-            "kat-4" -> "🏢 4. Kat"
-            "kat-5" -> "🏢 5. Kat"
-            "kat-6" -> "🏢 6. Kat"
-            else -> "🌐 Tüm Katlar"
-        }
+        val floorLabel = getFloorLabel(currentFloor)
 
         return NotificationCompat.Builder(this, FOREGROUND_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Makam Servis Mutfak ($floorLabel)")
-            .setContentText(if (isConnected) "🟢 Canlı Bağlantı - Siparişler dinleniyor" else "🟡 Bağlantı kuruluyor...")
+            .setContentTitle("Makam Servis Mutfak")
+            .setContentText(if (isConnected) "🟢 $floorLabel (Canlı)" else "🟡 $floorLabel (Bağlanıyor...)")
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
