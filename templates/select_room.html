@@ -78,6 +78,27 @@
         </div>
         {% endif %}
 
+        <!-- Mobil Uygulama & Hızlı Erişim Kartı -->
+        <div style="margin-top: 22px; background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 1.5px solid #86efac; border-radius: 14px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.8rem;">📱</span>
+                <div>
+                    <h4 style="margin: 0; font-size: 0.92rem; font-weight: 800; color: #14532d;">Mobil Uygulama Olarak Kullan</h4>
+                    <p style="margin: 2px 0 0 0; font-size: 0.78rem; color: #166534;">
+                        Telefona 1 tıkla ekleyin veya Android APK indirin
+                    </p>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" onclick="installPWA()" style="background: #16a34a; color: white; border: none; padding: 8px 14px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer;">
+                    📲 Ana Ekrana Ekle
+                </button>
+                <a href="/indir" style="background: #1e293b; color: white; text-decoration: none; padding: 8px 14px; border-radius: 8px; font-weight: 700; font-size: 0.82rem;">
+                    📥 APK İndir
+                </a>
+            </div>
+        </div>
+
         <div style="margin-top: 25px; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 15px; display: flex; justify-content: center; gap: 20px;">
             <a href="/mutfak" style="font-size: 0.85rem; color: #2563eb; text-decoration: none; font-weight: 600;">👨‍🍳 Mutfak Panelleri</a>
             <span style="color: #cbd5e1;">•</span>

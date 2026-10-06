@@ -249,8 +249,14 @@ async def logout():
 async def download_apk():
     apk_path = "static/makam-servis.apk"
     if os.path.exists(apk_path):
-        return FileResponse(apk_path, media_type="application/vnd.android.package-archive", filename="MakamServis.apk")
+        return FileResponse(
+            apk_path, 
+            media_type="application/vnd.android.package-archive", 
+            filename="MakamServis-v1.0.3.apk",
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+        )
     raise HTTPException(status_code=404, detail="Uygulama paketi henüz hazırlanmadı")
+
 
 @app.get("/mutfak", response_class=HTMLResponse)
 async def kitchen_selector(request: Request):

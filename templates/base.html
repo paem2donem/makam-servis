@@ -4,12 +4,129 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}Makam Servis{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20261006_03">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- PWA & Mobile Web App Meta Tags -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Makam Servis">
+    <link rel="apple-touch-icon" href="/static/img/icon-192.png">
+    <link rel="icon" type="image/png" href="/static/img/icon-192.png">
+
+    <link rel="stylesheet" href="/static/css/style.css?v=20261006_04">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     {% block head %}{% endblock %}
+
+    <style>
+        .pwa-install-bar {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-bottom: 2px solid #3b82f6;
+            color: #ffffff;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.88rem;
+            position: sticky;
+            top: 0;
+            z-index: 9999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .pwa-btn-install {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: white;
+            border: none;
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.82rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 0 2px 6px rgba(37,99,235,0.3);
+            text-decoration: none;
+        }
+        .pwa-close-btn {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0 6px;
+            line-height: 1;
+        }
+    </style>
 </head>
 <body>
+    <!-- PWA Install Banner -->
+    <div id="pwaInstallBanner" class="pwa-install-bar" style="display: none;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.4rem;">📲</span>
+            <div>
+                <strong style="color: #60a5fa;">Makam Servis Uygulaması</strong>
+                <div style="font-size: 0.75rem; color: #cbd5e1;">Ana ekrana ekleyip tam ekran kullanın</div>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button id="btnPwaInstall" class="pwa-btn-install" onclick="installPWA()">Yükle ⬇️</button>
+            <button class="pwa-close-btn" onclick="dismissPwaBanner()">✕</button>
+        </div>
+    </div>
+
     {% block content %}{% endblock %}
     {% block scripts %}{% endblock %}
+
+    <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js').catch(err => {
+                    console.log('SW registration error:', err);
+                });
+            });
+        }
+
+        // PWA Install Prompt handling
+        let deferredPrompt;
+        const banner = document.getElementById('pwaInstallBanner');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (banner && !sessionStorage.getItem('pwa_dismissed')) {
+                banner.style.display = 'flex';
+            }
+        });
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the PWA install prompt');
+                        if (banner) banner.style.display = 'none';
+                    }
+                    deferredPrompt = null;
+                });
+            } else {
+                // If not Chrome or beforeinstallprompt not fired (e.g. Safari / iOS)
+                alert('📱 Uygulamayı Yüklemek İçin:\n\nTarayıcınızın menüsünden (sağ üstteki 3 nokta veya alttaki Paylaş simgesi) "Ana Ekrana Ekle" veya "Uygulamayı Yükle" seçeneğine dokunun.');
+            }
+        }
+
+        function dismissPwaBanner() {
+            if (banner) banner.style.display = 'none';
+            sessionStorage.setItem('pwa_dismissed', '1');
+        }
+
+        // Check if running in standalone mode (already installed PWA)
+        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+            if (banner) banner.style.display = 'none';
+        }
+    </script>
 </body>
 </html>
+
