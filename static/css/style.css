@@ -607,74 +607,157 @@ body {
 .btn-save-mini { background: #4338ca; color: white; border: none; border-radius: 6px; padding: 6px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
 
 /* ==========================================================================
-   PERFECT SINGLE-PAGE PRINT STYLES FOR QR CODES
+   PERFECT PRINT STYLES FOR QR CODES (MUTFAKLAR & ODALAR)
    ========================================================================== */
 @media print {
     @page {
         size: A4 portrait;
-        margin: 8mm;
+        margin: 10mm 8mm;
     }
     html, body {
-        background: white !important;
-        color: black !important;
+        background: #ffffff !important;
+        color: #000000 !important;
         background-image: none !important;
         width: 100% !important;
-        height: 100% !important;
+        height: auto !important;
         margin: 0 !important;
         padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
+
+    /* KESİNLİKLE ÇIKTIDA GÖRÜNMEYECEK ALANLAR (DÜZENLE KISIMLARI, BUTONLAR, TABLAR) */
     .admin-banner-header, 
     .segmented-tab-bar, 
     .panel-header, 
     .room-edit-box, 
-    .btn-open-url, 
-    .app-header, 
-    .toast, 
-    .form-label-custom,
+    .room-edit-form,
+    #newRoomForm,
     #adminTabKitchen,
-    #adminTabProducts { 
+    #adminTabProducts,
+    .floor-filter-toolbar,
+    button,
+    input,
+    select,
+    form,
+    details,
+    summary,
+    .btn-save-mini,
+    .btn-gradient-primary,
+    .btn-outline-primary,
+    .btn-action-edit,
+    .btn-action-delete,
+    .drag-hint-badge,
+    .drag-handle-grip,
+    .admin-status-badge,
+    .btn-admin-logout,
+    audio,
+    .toast { 
         display: none !important; 
+        visibility: hidden !important;
+        height: 0 !important;
+        max-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        overflow: hidden !important;
     }
-    
+
     .container, .admin-main-container {
         max-width: 100% !important;
+        width: 100% !important;
         padding: 0 !important;
         margin: 0 !important;
     }
+    
     .glass-panel {
-        background: white !important;
+        background: transparent !important;
         border: none !important;
         box-shadow: none !important;
         padding: 0 !important;
+        margin: 0 !important;
     }
+    
     #adminTabRooms { 
         display: block !important; 
     }
+    
     .rooms-cards-grid { 
         display: grid !important; 
         grid-template-columns: repeat(3, 1fr) !important; 
-        gap: 10mm !important; 
-        page-break-inside: avoid !important;
+        gap: 6mm !important; 
+        margin-bottom: 8mm !important;
+        page-break-inside: auto !important;
     }
+    
     .room-manage-card { 
-        border: 2px dashed #0f172a !important; 
-        border-radius: 12px !important;
         box-shadow: none !important; 
-        padding: 10px !important; 
-        text-align: center !important;
-        background: #ffffff !important;
+        padding: 12px !important; 
+        border-radius: 12px !important;
         page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        margin-bottom: 0 !important;
+        text-align: center !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
+    
     .room-manage-header {
-        justify-content: center !important;
-        margin-bottom: 4px !important;
-        padding-bottom: 4px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        margin-bottom: 8px !important;
+        padding-bottom: 6px !important;
+        border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+        text-align: left !important;
     }
+    
     .room-icon-badge {
+        display: flex !important;
+        width: 28px !important;
+        height: 28px !important;
+        border-radius: 6px !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 0.9rem !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    .room-current-title {
+        font-size: 0.92rem !important;
+        font-weight: 800 !important;
+    }
+
+    .theme-qr-box {
+        padding: 10px !important;
+        margin: 8px 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    .qr-code-img { 
+        width: 140px !important; 
+        height: 140px !important; 
+        display: inline-block !important;
+    }
+
+    .print-section-title {
+        font-size: 1.05rem !important;
+        font-weight: 700 !important;
+        color: #1e293b !important;
+        margin: 6mm 0 3mm 0 !important;
+        padding-bottom: 2mm !important;
+        border-bottom: 1.5px solid #cbd5e1 !important;
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+    }
+
+    /* Özel yazdırma filtreleri */
+    body.print-only-rooms #kitchenQrSection {
         display: none !important;
     }
-    .qr-code-img { 
-        width: 145px !important; 
-        height: 145px !important; 
+    body.print-only-kitchen #roomsQrSection {
+        display: none !important;
     }
 }
