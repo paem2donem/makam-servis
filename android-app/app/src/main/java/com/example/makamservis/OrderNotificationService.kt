@@ -81,6 +81,11 @@ class OrderNotificationService : Service() {
         .readTimeout(0, TimeUnit.MILLISECONDS)
         .build()
 
+    private val httpClient = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .build()
+
     private var webSocket: WebSocket? = null
     private var currentFloor: String = "makam"
     private var isMuted: Boolean = false
@@ -102,7 +107,7 @@ class OrderNotificationService : Service() {
         currentFloor = prefs.getString(PREF_FLOOR, "makam") ?: "makam"
         isMuted = prefs.getBoolean(PREF_IS_MUTED, false)
         
-        val initialStatus = if (isMuted) "🔕 İzinli (Sessiz)" else "Mutfak Takibi Başlatılıyor..."
+        val initialStatus = if (isMuted) "🔇 Sesli Uyarı Kapalı" else "Mutfak Takibi Başlatılıyor..."
         safeStartForeground(createForegroundNotification(initialStatus))
         
         Thread {
@@ -113,7 +118,7 @@ class OrderNotificationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val currentStatus = if (isMuted) "🔕 İzinli (Sessiz)" else if (isConnected) "🟢 Canlı Takip Aktif" else "🟡 Bağlantı Kuruluyor..."
+        val currentStatus = if (isMuted) "🔇 Sesli Uyarı Kapalı" else if (isConnected) "🟢 Sesli Uyarı Açık" else "🟡 Bağlantı Kuruluyor..."
         safeStartForeground(createForegroundNotification(currentStatus))
 
         when (intent?.action) {
@@ -176,15 +181,34 @@ class OrderNotificationService : Service() {
         val url = "http://$SERVER_HOST/api/orders/active?floor=$currentFloor"
         val request = Request.Builder().url(url).build()
         try {
-            val response = client.newCall(request).execute()
+            val response = httpClient.newCall(request).execute()
             if (response.isSuccessful) {
                 val body = response.body?.string() ?: ""
                 val jsonArray = JSONArray(body)
+                val nowMs = System.currentTimeMillis()
                 synchronized(seenOrderIds) {
                     seenOrderIds.clear()
                     for (i in 0 until jsonArray.length()) {
                         val order = jsonArray.getJSONObject(i)
-                        seenOrderIds.add(order.getInt("id"))
+                        val orderId = order.getInt("id")
+                        val createdAtStr = order.optString("created_at", "")
+                        
+                        // Son 3 dakika içinde verilmiş siparişleri atlama, onlar için uyarı çalsın
+                        var isVeryRecent = false
+                        if (createdAtStr.isNotBlank()) {
+                            try {
+                                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
+                                sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
+                                val date = sdf.parse(createdAtStr.substringBefore("."))
+                                if (date != null && (nowMs - date.time) < 180_000) {
+                                    isVeryRecent = true
+                                }
+                            } catch (_: Exception) {}
+                        }
+
+                        if (!isVeryRecent) {
+                            seenOrderIds.add(orderId)
+                        }
                     }
                 }
                 Log.d(TAG, "Snapshot success: ${seenOrderIds.size} existing orders cached for floor $currentFloor")
@@ -199,14 +223,14 @@ class OrderNotificationService : Service() {
 
         scheduler?.shutdownNow()
         scheduler = Executors.newSingleThreadScheduledExecutor()
-        // Poll every 6 seconds as a guaranteed backup in case of network drops
+        // Her 3 saniyede bir kesintisiz yedek sorgu (WebSocket kopsa bile sipariş anında yakalanır)
         scheduler?.scheduleWithFixedDelay({
             try {
                 fetchAndCheckOrders()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error polling orders", e)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Error polling orders", t)
             }
-        }, 3, 6, TimeUnit.SECONDS)
+        }, 1, 3, TimeUnit.SECONDS)
     }
 
     private fun restartConnection() {
@@ -271,7 +295,7 @@ class OrderNotificationService : Service() {
         val request = Request.Builder().url(url).build()
 
         try {
-            val response = client.newCall(request).execute()
+            val response = httpClient.newCall(request).execute()
             if (!response.isSuccessful) return
             val body = response.body?.string() ?: return
             val jsonArray = JSONArray(body)
@@ -313,14 +337,14 @@ class OrderNotificationService : Service() {
                     triggerOrderAlert(roomName, itemsSummary)
                 }
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch orders: ${e.message}")
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to fetch orders: ${t.message}")
         }
     }
 
     private fun triggerOrderAlert(roomName: String, itemsSummary: String) {
         if (isMuted) {
-            Log.d(TAG, "İzinli / Sessiz mod aktif: Ses ve titreşim çalınmadı ($roomName).")
+            Log.d(TAG, "Sesli uyarı kapalı: Ses ve titreşim engellendi ($roomName).")
             val intent = Intent(BROADCAST_NEW_ORDER).apply {
                 putExtra("room_name", roomName)
                 putExtra("items_summary", itemsSummary)
@@ -355,8 +379,8 @@ class OrderNotificationService : Service() {
 
     private fun playAlarmRingtone() {
         try {
-            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             val ringtone = RingtoneManager.getRingtone(applicationContext, soundUri)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 ringtone.isLooping = false
@@ -412,8 +436,8 @@ class OrderNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
         val notif = NotificationCompat.Builder(this, ORDER_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -457,8 +481,8 @@ class OrderNotificationService : Service() {
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 600, 250, 600, 250, 800)
                 setSound(
-                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
                         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -479,9 +503,9 @@ class OrderNotificationService : Service() {
 
         val floorLabel = getFloorLabel(currentFloor)
         val displayText = if (isMuted) {
-            "🔕 $floorLabel (İzinli / Sessiz Mod)"
+            "🔇 $floorLabel (Sesli Uyarı Kapalı)"
         } else if (isConnected) {
-            "🟢 $floorLabel ($statusText)"
+            "🟢 $floorLabel (Sesli Uyarı Açık)"
         } else {
             "🟡 $floorLabel ($statusText)"
         }
@@ -498,7 +522,7 @@ class OrderNotificationService : Service() {
 
     private fun updateForegroundNotification() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val text = if (isMuted) "İzinli (Sessiz)" else if (isConnected) "Canlı" else "Bağlanıyor"
+        val text = if (isMuted) "Sesli Uyarı Kapalı" else if (isConnected) "Sesli Uyarı Açık" else "Bağlanıyor"
         manager.notify(FOREGROUND_NOTIF_ID, createForegroundNotification(text))
     }
 

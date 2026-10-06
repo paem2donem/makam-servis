@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
                     val items = intent.getStringExtra("items_summary") ?: ""
                     val isMuted = intent.getBooleanExtra("is_muted", false)
                     if (isMuted) {
-                        Toast.makeText(this@MainActivity, "🔕 (İzinli Mod) $room yeni sipariş verdi", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@MainActivity, "🔇 (Sesli Uyarı Kapalı) $room yeni sipariş verdi", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(this@MainActivity, "🛎️ $room: $items", Toast.LENGTH_LONG).show()
                     }
@@ -228,9 +228,9 @@ class MainActivity : ComponentActivity() {
         }
 
         if (muted) {
-            Toast.makeText(this, "🔕 İzinli Modu Açıldı (Sessiz)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "🔇 Sesli Uyarı Kapatıldı (Telefon çalmaz)", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "🔔 Nöbet Modu Aktif (Sesli)", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "🔊 Sesli Uyarı Açıldı (Telefon sesli çalar)", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -464,7 +464,7 @@ fun AppScreen(
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = if (isMuted) "İzinli" else if (isConnected) "Canlı" else "Bağlanıyor",
+                                            text = if (isMuted) "Ses Kapalı" else if (isConnected) "Canlı" else "Bağlanıyor",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White
@@ -475,7 +475,7 @@ fun AppScreen(
                         }
                         Text(
                             text = when (role) {
-                                OrderNotificationService.ROLE_KITCHEN -> if (isMuted) "🔕 İzinli modu aktif - telefon sessizde" else "Sadece bu katın siparişleri çalar"
+                                OrderNotificationService.ROLE_KITCHEN -> if (isMuted) "🔇 Sesli uyarı kapalı - telefon sessizde" else "🔊 Sesli uyarı açık - kat siparişleri çalar"
                                 OrderNotificationService.ROLE_ROOM -> "Sipariş verme ekranı"
                                 OrderNotificationService.ROLE_ADMIN -> "Sistem yönetim ekranı"
                                 else -> ""
@@ -505,7 +505,7 @@ fun AppScreen(
                         }
                     }
 
-                    // Mute / İzinli Toggle Button for Kitchen
+                    // Sesli Uyarı Açık / Kapalı Toggle Button for Kitchen
                     if (role == OrderNotificationService.ROLE_KITCHEN) {
                         Surface(
                             modifier = Modifier
@@ -515,7 +515,7 @@ fun AppScreen(
                             color = if (isMuted) Color(0xFFDC2626) else Color(0xFF16A34A)
                         ) {
                             Text(
-                                text = if (isMuted) "🔕 İzinli" else "🔊 Nöbette",
+                                text = if (isMuted) "🔇 Sesli Uyarı: Kapalı" else "🔊 Sesli Uyarı: Açık",
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -570,7 +570,7 @@ fun AppScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // İzinli / Sessiz Mod Uyarı Bandı
+            // Sesli Uyarı Kapalı Uyarı Bandı
             if (role == OrderNotificationService.ROLE_KITCHEN && isMuted) {
                 Surface(
                     modifier = Modifier
@@ -584,11 +584,11 @@ fun AppScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "🔕", fontSize = 16.sp)
+                            Text(text = "🔇", fontSize = 16.sp)
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = "İzinli / Sessiz Modundasınız",
+                                    text = "Sesli Uyarı Kapalı",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
                                     color = Color(0xFF991B1B)
@@ -605,7 +605,7 @@ fun AppScreen(
                             color = Color(0xFFDC2626)
                         ) {
                             Text(
-                                text = "Sesi Aç ▶",
+                                text = "Aç ▶",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp,

@@ -1,4 +1,6 @@
 let isKitchenMuted = localStorage.getItem('kitchen_muted') === 'true';
+let knownOrderIds = new Set();
+let isInitialLoad = true;
 
 document.addEventListener('DOMContentLoaded', () => {
     const appEl = document.getElementById('kitchenApp');
@@ -12,13 +14,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function updateMuteButtonUI() {
     const btn = document.getElementById('btnMuteToggle');
-    if (!btn) return;
-    if (isKitchenMuted) {
-        btn.innerHTML = '🔕 İzinli (Sessiz)';
-        btn.style.background = '#dc2626';
-    } else {
-        btn.innerHTML = '🔊 Nöbette';
-        btn.style.background = '#16a34a';
+    const badge = document.getElementById('soundBadge');
+    
+    if (btn) {
+        if (isKitchenMuted) {
+            btn.innerHTML = '🔇 Sesli Uyarı: Kapalı';
+            btn.style.background = '#dc2626';
+        } else {
+            btn.innerHTML = '🔊 Sesli Uyarı: Açık';
+            btn.style.background = '#16a34a';
+        }
+    }
+
+    if (badge) {
+        if (isKitchenMuted) {
+            badge.innerHTML = '🔇 Sesli Uyarı Kapalı';
+            badge.style.background = '#dc2626';
+            badge.style.color = '#ffffff';
+        } else {
+            badge.innerHTML = '🔊 Sesli Uyarı Açık';
+            badge.style.background = '#16a34a';
+            badge.style.color = '#ffffff';
+        }
     }
 }
 
@@ -26,65 +43,118 @@ function toggleKitchenMute() {
     isKitchenMuted = !isKitchenMuted;
     localStorage.setItem('kitchen_muted', isKitchenMuted ? 'true' : 'false');
     updateMuteButtonUI();
+    if (!isKitchenMuted) {
+        // Test sound briefly when turning sound back ON
+        playSound();
+    }
 }
 
 // Pre-arm audio on first touch/click anywhere so browser autoplay never blocks sound
-function armAudioPermanently() {
+function armAudioPermanently(forcePlay = false) {
+    const banner = document.getElementById('audioUnlockBanner');
+    
     const unlockAudio = () => {
         const audio = document.getElementById('notificationSound');
         if (audio) {
             audio.play().then(() => {
-                audio.pause();
-                audio.currentTime = 0;
+                if (!forcePlay) {
+                    audio.pause();
+                    audio.currentTime = 0;
+                }
             }).catch(() => {});
         }
+        
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+                const ctx = new AudioCtx();
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+            }
+        } catch (_) {}
+
+        if (banner) banner.style.display = 'none';
+
         document.removeEventListener('click', unlockAudio);
         document.removeEventListener('touchstart', unlockAudio);
         document.removeEventListener('keydown', unlockAudio);
     };
 
-    document.addEventListener('click', unlockAudio);
-    document.addEventListener('touchstart', unlockAudio);
-    document.addEventListener('keydown', unlockAudio);
+    if (forcePlay) {
+        unlockAudio();
+    } else {
+        document.addEventListener('click', unlockAudio);
+        document.addEventListener('touchstart', unlockAudio);
+        document.addEventListener('keydown', unlockAudio);
+    }
 }
 
 function setupWebSocket(currentFloor) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/mutfak/${currentFloor}`);
+    const wsUrl = `${protocol}//${window.location.host}/ws/mutfak/${currentFloor}`;
+    let ws = null;
+    let reconnectTimeout = null;
 
-    ws.onmessage = (event) => {
-        if (event.data === 'new_order') {
-            playSound();
-            fetchOrders(currentFloor);
-        } else if (event.data === 'order_completed') {
-            fetchOrders(currentFloor);
+    function connect() {
+        if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+            return;
         }
-    };
 
-    ws.onclose = () => {
-        setTimeout(() => setupWebSocket(currentFloor), 3000);
-    };
+        try {
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log("Mutfak WebSocket bağlantısı kuruldu:", currentFloor);
+            };
+
+            ws.onmessage = (event) => {
+                if (event.data === 'new_order' || event.data === 'order_completed') {
+                    fetchOrders(currentFloor);
+                }
+            };
+
+            ws.onerror = (err) => {
+                console.warn("WebSocket hatası:", err);
+            };
+
+            ws.onclose = () => {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = setTimeout(connect, 3000);
+            };
+        } catch (e) {
+            clearTimeout(reconnectTimeout);
+            reconnectTimeout = setTimeout(connect, 3000);
+        }
+    }
+
+    connect();
+
+    // Kesintisiz 3 saniyede bir otomatik polling garantisi (Ağ/WS kopsa dahi sipariş anında ekrana düşer)
+    setInterval(() => {
+        fetchOrders(currentFloor);
+    }, 3000);
 }
 
 function playSound() {
     if (isKitchenMuted) {
-        console.log("Mutfak izinli / sessiz modunda. Ses ve titreşim engellendi.");
+        console.log("Sesli uyarı kapalı. Ses ve titreşim çalınmadı.");
         return;
     }
 
-    // 1. Try HTML5 Audio element
+    // 1. HTML5 Audio element
     const audio = document.getElementById('notificationSound');
     if (audio) {
         audio.currentTime = 0;
         audio.play().catch(e => {
-            console.log("Audio tag play prevented, using WebAudio:", e);
+            console.log("Audio tag play prevented, using WebAudio chime:", e);
         });
     }
 
-    // 2. Play Web Audio API synthetic ding-dong bell (works 100% offline, no CDN needed)
+    // 2. Web Audio API synthesizer (Çevrimdışı & CDN bağımsız %100 ding-dong)
     playWebAudioChime();
 
-    // 3. Vibrate device if supported
+    // 3. Titreşim (Mobil destekli)
     if (navigator.vibrate) {
         try {
             navigator.vibrate([400, 200, 400]);
@@ -102,24 +172,24 @@ function playWebAudioChime() {
         }
 
         const now = ctx.currentTime;
-        // High chime (E5 - 659.25Hz)
+        // Birinci ton: 659.25Hz (E5)
         const osc1 = ctx.createOscillator();
         const gain1 = ctx.createGain();
         osc1.type = 'sine';
         osc1.frequency.setValueAtTime(659.25, now);
-        gain1.gain.setValueAtTime(0.8, now);
+        gain1.gain.setValueAtTime(0.85, now);
         gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
         osc1.connect(gain1);
         gain1.connect(ctx.destination);
         osc1.start(now);
         osc1.stop(now + 0.6);
 
-        // Warm lower bell chime (C5 - 523.25Hz)
+        // İkinci sıcak ton: 523.25Hz (C5)
         const osc2 = ctx.createOscillator();
         const gain2 = ctx.createGain();
         osc2.type = 'sine';
         osc2.frequency.setValueAtTime(523.25, now + 0.22);
-        gain2.gain.setValueAtTime(0.9, now + 0.22);
+        gain2.gain.setValueAtTime(0.95, now + 0.22);
         gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
         osc2.connect(gain2);
         gain2.connect(ctx.destination);
@@ -130,12 +200,29 @@ function playWebAudioChime() {
     }
 }
 
-
 async function fetchOrders(currentFloor) {
     try {
         const floorParam = currentFloor ? `?floor=${encodeURIComponent(currentFloor)}` : '';
         const res = await fetch(`/api/orders/active${floorParam}`);
+        if (!res.ok) return;
         const orders = await res.json();
+
+        // Yeni gelen sipariş kontrolü
+        let hasBrandNewOrder = false;
+        orders.forEach(order => {
+            if (!knownOrderIds.has(order.id)) {
+                if (!isInitialLoad) {
+                    hasBrandNewOrder = true;
+                }
+                knownOrderIds.add(order.id);
+            }
+        });
+
+        if (hasBrandNewOrder) {
+            playSound();
+        }
+
+        isInitialLoad = false;
         renderOrders(orders, currentFloor);
     } catch (e) {
         console.error("Orders fetch error:", e);
@@ -147,6 +234,7 @@ function renderOrders(orders, currentFloor) {
     const countPill = document.getElementById('kitchenOrderCount');
     if (countPill) countPill.textContent = orders.length;
 
+    if (!container) return;
     container.innerHTML = '';
 
     if (orders.length === 0) {
