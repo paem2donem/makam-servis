@@ -303,7 +303,7 @@
                 🌐 Tüm Katlar (<span id="count-all">0</span>)
             </button>
             <button type="button" class="btn-floor-tab" data-floor="makam" onclick="filterAdminKitchen('makam', this)" style="padding: 6px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155;">
-                👑 Makam Katı (<span id="count-makam">0</span>)
+                ⭐ Makam Katı (<span id="count-makam">0</span>)
             </button>
             <button type="button" class="btn-floor-tab" data-floor="kat-3" onclick="filterAdminKitchen('kat-3', this)" style="padding: 6px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; cursor: pointer; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155;">
                 🏢 3. Kat (<span id="count-kat-3">0</span>)
@@ -433,7 +433,7 @@
                 <input type="text" id="newRoomName" placeholder="Oda Adı (Örn: 3. Kat Toplantı Odası)" class="form-input-custom inline-input" style="flex: 2; min-width: 180px;" required>
                 <input type="text" id="newRoomSlug" placeholder="Link (Örn: kat3-toplanti)" class="form-input-custom inline-input" style="flex: 1.5; min-width: 140px;" required>
                 <select id="newRoomFloor" class="form-input-custom inline-input" style="flex: 1.5; min-width: 140px;">
-                    <option value="makam">👑 Makam Katı</option>
+                    <option value="makam">⭐ Makam Katı</option>
                     <option value="kat-3">🏢 3. Kat</option>
                     <option value="kat-4">🏢 4. Kat</option>
                     <option value="kat-5">🏢 5. Kat</option>
@@ -452,7 +452,7 @@
                     <!-- MAKAM MUTFAK -->
                     <div class="room-manage-card qr-printable-card kitchen-clickable-card theme-makam" onclick="window.open('/mutfak/makam', '_blank')" title="Makam Katı Mutfak Ekranını Aç (Tıklayın)" style="border: 2px solid #312e81; background: #eef2ff; cursor: pointer;">
                         <div class="room-manage-header" style="display: flex; align-items: center; gap: 8px;">
-                            <div class="room-icon-badge" style="background: #312e81; color: #fbbf24;">👑</div>
+                            <div class="room-icon-badge" style="background: #312e81; color: #fbbf24;">⭐</div>
                             <div style="flex: 1; min-width: 0;">
                                 <div class="room-current-title" style="color: #312e81; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Makam Katı Mutfağı</div>
                                 <span class="card-url-link" style="color: #6366f1;">/mutfak/makam</span>
@@ -552,7 +552,7 @@
                         {% set title_col = '#312e81' %}
                         {% set sub_col = '#6366f1' %}
                         {% set qr_dash = '#6366f1' %}
-                        {% set icon_char = '👑' %}
+                        {% set icon_char = '⭐' %}
                         {% set floor_label = 'Makam Katı' %}
                     {% elif r.floor == 'kat-3' %}
                         {% set border_col = '#2563eb' %}
@@ -644,7 +644,7 @@
                                     <div>
                                         <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 2px; color: #475569; font-weight: 600;">Bağlı Olduğu Kat Mutfağı:</label>
                                         <select id="roomFloor-{{ r.id }}" class="form-input-custom inline-input" style="font-size: 0.85rem; width: 100%; box-sizing: border-box;">
-                                            <option value="makam" {% if r.floor == 'makam' or not r.floor %}selected{% endif %}>👑 Makam Katı Mutfağı</option>
+                                            <option value="makam" {% if r.floor == 'makam' or not r.floor %}selected{% endif %}>⭐ Makam Katı Mutfağı</option>
                                             <option value="kat-3" {% if r.floor == 'kat-3' %}selected{% endif %}>🏢 3. Kat Mutfağı</option>
                                             <option value="kat-4" {% if r.floor == 'kat-4' %}selected{% endif %}>🏢 4. Kat Mutfağı</option>
                                             <option value="kat-5" {% if r.floor == 'kat-5' %}selected{% endif %}>🏢 5. Kat Mutfağı</option>
