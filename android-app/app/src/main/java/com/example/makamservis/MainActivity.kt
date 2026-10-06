@@ -6,8 +6,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioManager
+import android.media.RingtoneManager
+import android.media.ToneGenerator
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
@@ -42,12 +49,22 @@ import androidx.core.content.ContextCompat
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import java.util.Collections
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 data class RoomItem(
     val id: Int,
     val name: String,
     val slug: String,
     val floor: String
+)
+
+data class NewOrderPopupData(
+    val id: Int,
+    val roomName: String,
+    val itemsSummary: String
 )
 
 class MainActivity : ComponentActivity() {
@@ -62,6 +79,10 @@ class MainActivity : ComponentActivity() {
     private var showRoleDialogState = mutableStateOf(false)
     private var showRoomPickerState = mutableStateOf(false)
     private var availableRoomsState = mutableStateOf<List<RoomItem>>(emptyList())
+    private var newOrderAlertState = mutableStateOf<NewOrderPopupData?>(null)
+
+    private var activityScheduler: ScheduledExecutorService? = null
+    private val foregroundSeenOrderIds = Collections.synchronizedSet(mutableSetOf<Int>())
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -70,10 +91,13 @@ class MainActivity : ComponentActivity() {
                     val room = intent.getStringExtra("room_name") ?: "Yeni Sipariş"
                     val items = intent.getStringExtra("items_summary") ?: ""
                     val isMuted = intent.getBooleanExtra("is_muted", false)
+                    val orderId = intent.getIntExtra("order_id", 0)
                     if (isMuted) {
                         Toast.makeText(this@MainActivity, "🔇 (Sesli Uyarı Kapalı) $room yeni sipariş verdi", Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(this@MainActivity, "🛎️ $room: $items", Toast.LENGTH_LONG).show()
+                        playInAppLoudAlert()
+                        newOrderAlertState.value = NewOrderPopupData(orderId, room, items)
                     }
                     webViewRef?.reload()
                 }
@@ -141,6 +165,11 @@ class MainActivity : ComponentActivity() {
                     showRoleDialog = showRoleDialogState.value,
                     showRoomPicker = showRoomPickerState.value,
                     availableRooms = availableRoomsState.value,
+                    newOrderAlert = newOrderAlertState.value,
+                    onDismissNewOrderAlert = {
+                        newOrderAlertState.value = null
+                        webViewRef?.reload()
+                    },
                     onOpenRoleDialog = { showRoleDialogState.value = true },
                     onDismissRoleDialog = { showRoleDialogState.value = false },
                     onOpenRoomPicker = { showRoomPickerState.value = true },
@@ -257,6 +286,8 @@ class MainActivity : ComponentActivity() {
         selectedRoomSlugState.value = slug
         selectedRoomNameState.value = name
 
+        foregroundSeenOrderIds.clear()
+
         val prefs = getSharedPreferences(OrderNotificationService.PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit()
             .putString(OrderNotificationService.PREF_ROLE, role)
@@ -300,7 +331,9 @@ class MainActivity : ComponentActivity() {
             } else {
                 startService(intent)
             }
+            startForegroundOrderChecker()
         } else {
+            stopForegroundOrderChecker()
             // Stop loud alarm service for Room or Admin users
             val intent = Intent(this, OrderNotificationService::class.java).apply {
                 action = OrderNotificationService.ACTION_STOP
@@ -346,7 +379,117 @@ class MainActivity : ComponentActivity() {
         }.start()
     }
 
+    private fun playInAppLoudAlert() {
+        if (isMutedState.value) return
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            @Suppress("DEPRECATION")
+            val wl = pm.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
+                "makamservis:inapp_alert"
+            )
+            wl.acquire(5000)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Wakelock error", e)
+        }
+
+        try {
+            val toneGen = ToneGenerator(AudioManager.STREAM_ALARM, 100)
+            toneGen.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 1200)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "ToneGenerator error", e)
+        }
+
+        try {
+            val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            val ringtone = RingtoneManager.getRingtone(applicationContext, soundUri)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                ringtone.audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            }
+            ringtone.play()
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Ringtone error", e)
+        }
+
+        try {
+            val pattern = longArrayOf(0, 700, 250, 700, 250, 900)
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager
+                vm?.defaultVibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1), audioAttributes)
+            } else {
+                @Suppress("DEPRECATION")
+                val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v?.vibrate(VibrationEffect.createWaveform(pattern, -1), audioAttributes)
+                } else {
+                    @Suppress("DEPRECATION")
+                    v?.vibrate(pattern, -1)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Vibrator error", e)
+        }
+    }
+
+    private fun startForegroundOrderChecker() {
+        stopForegroundOrderChecker()
+        if (selectedRoleState.value != OrderNotificationService.ROLE_KITCHEN) return
+
+        activityScheduler = Executors.newSingleThreadScheduledExecutor()
+        activityScheduler?.scheduleWithFixedDelay({
+            try {
+                if (selectedRoleState.value != OrderNotificationService.ROLE_KITCHEN) return@scheduleWithFixedDelay
+                val floor = selectedFloorState.value
+                val url = "http://${OrderNotificationService.SERVER_HOST}/api/orders/active?floor=$floor"
+                val request = Request.Builder().url(url).build()
+                val response = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).build().newCall(request).execute()
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: ""
+                    val jsonArray = JSONArray(body)
+                    for (i in 0 until jsonArray.length()) {
+                        val order = jsonArray.getJSONObject(i)
+                        val orderId = order.getInt("id")
+                        if (!foregroundSeenOrderIds.contains(orderId)) {
+                            foregroundSeenOrderIds.add(orderId)
+                            val roomName = order.optString("room_name", "Bilinmeyen Oda")
+                            val itemsSummary = order.optString("items_summary", "Yeni Sipariş")
+                            runOnUiThread {
+                                if (!isMutedState.value) {
+                                    playInAppLoudAlert()
+                                }
+                                newOrderAlertState.value = NewOrderPopupData(orderId, roomName, itemsSummary)
+                                webViewRef?.reload()
+                            }
+                        }
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.d("MainActivity", "Foreground check: ${t.message}")
+            }
+        }, 1, 2500, TimeUnit.MILLISECONDS)
+    }
+
+    private fun stopForegroundOrderChecker() {
+        activityScheduler?.shutdownNow()
+        activityScheduler = null
+    }
+
     private fun testAlert() {
+        playInAppLoudAlert()
+        newOrderAlertState.value = NewOrderPopupData(
+            id = 9999,
+            roomName = "🔔 Test Odası",
+            itemsSummary = "1x Çay, 1x Su (Ses ve titreşim testi başarılı)"
+        )
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     this,
@@ -366,7 +509,7 @@ class MainActivity : ComponentActivity() {
             } else {
                 startService(intent)
             }
-            Toast.makeText(this, "🔔 Ses ve titreşim testi gönderildi!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "🔔 Ses ve titreşim testi çalındı!", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Log.e("MainActivity", "Test alert error", e)
             Toast.makeText(this, "Hata: ${e.message}", Toast.LENGTH_LONG).show()
@@ -385,8 +528,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        startForegroundOrderChecker()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopForegroundOrderChecker()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        stopForegroundOrderChecker()
         try {
             unregisterReceiver(receiver)
         } catch (_: Exception) {}
@@ -413,6 +567,8 @@ fun AppScreen(
     showRoleDialog: Boolean,
     showRoomPicker: Boolean,
     availableRooms: List<RoomItem>,
+    newOrderAlert: NewOrderPopupData?,
+    onDismissNewOrderAlert: () -> Unit,
     onOpenRoleDialog: () -> Unit,
     onDismissRoleDialog: () -> Unit,
     onOpenRoomPicker: () -> Unit,
@@ -675,6 +831,63 @@ fun AppScreen(
             currentSlug = roomSlug,
             onDismiss = onDismissRoomPicker,
             onSelect = onSelectRoom
+        )
+    }
+
+    if (newOrderAlert != null) {
+        AlertDialog(
+            onDismissRequest = onDismissNewOrderAlert,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🛎️ ", fontSize = 24.sp)
+                    Text(
+                        text = "YENİ SİPARİŞ!",
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFDC2626),
+                        fontSize = 20.sp
+                    )
+                }
+            },
+            text = {
+                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                    Surface(
+                        color = Color(0xFFEFF6FF),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    ) {
+                        Text(
+                            text = newOrderAlert.roomName,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            color = Color(0xFF1E40AF),
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                    Text(
+                        text = "Sipariş Detayı:",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = Color(0xFF64748B)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (newOrderAlert.itemsSummary.isNotBlank()) newOrderAlert.itemsSummary else "Detaylar ekranda...",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF1E293B)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = onDismissNewOrderAlert,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Siparişi Gör & Tamam", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
         )
     }
 }

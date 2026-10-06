@@ -36,7 +36,7 @@ class OrderNotificationService : Service() {
     companion object {
         const val TAG = "OrderNotifService"
         const val FOREGROUND_CHANNEL_ID = "makam_fg_channel"
-        const val ORDER_CHANNEL_ID = "makam_orders_channel_high"
+        const val ORDER_CHANNEL_ID = "makam_order_channel_loud_v4"
         const val FOREGROUND_NOTIF_ID = 1001
 
         const val ACTION_START = "ACTION_START"
@@ -178,43 +178,11 @@ class OrderNotificationService : Service() {
     }
 
     private fun snapshotExistingOrders() {
-        val url = "http://$SERVER_HOST/api/orders/active?floor=$currentFloor"
-        val request = Request.Builder().url(url).build()
+        // Bekleyen siparişleri sessizce yutmak yerine anında denetle ve uyarıyı çal
         try {
-            val response = httpClient.newCall(request).execute()
-            if (response.isSuccessful) {
-                val body = response.body?.string() ?: ""
-                val jsonArray = JSONArray(body)
-                val nowMs = System.currentTimeMillis()
-                synchronized(seenOrderIds) {
-                    seenOrderIds.clear()
-                    for (i in 0 until jsonArray.length()) {
-                        val order = jsonArray.getJSONObject(i)
-                        val orderId = order.getInt("id")
-                        val createdAtStr = order.optString("created_at", "")
-                        
-                        // Son 3 dakika içinde verilmiş siparişleri atlama, onlar için uyarı çalsın
-                        var isVeryRecent = false
-                        if (createdAtStr.isNotBlank()) {
-                            try {
-                                val sdf = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US)
-                                sdf.timeZone = java.util.TimeZone.getTimeZone("UTC")
-                                val date = sdf.parse(createdAtStr.substringBefore("."))
-                                if (date != null && (nowMs - date.time) < 180_000) {
-                                    isVeryRecent = true
-                                }
-                            } catch (_: Exception) {}
-                        }
-
-                        if (!isVeryRecent) {
-                            seenOrderIds.add(orderId)
-                        }
-                    }
-                }
-                Log.d(TAG, "Snapshot success: ${seenOrderIds.size} existing orders cached for floor $currentFloor")
-            }
+            fetchAndCheckOrders()
         } catch (e: Exception) {
-            Log.e(TAG, "Error snapshotting orders: ${e.message}")
+            Log.e(TAG, "Error checking orders on snapshot: ${e.message}")
         }
     }
 
@@ -334,7 +302,7 @@ class OrderNotificationService : Service() {
                         }
                     }
                     Log.d(TAG, ">>> YENI SIPARIS BULUNDU: #$orderId - $roomName: $itemsSummary")
-                    triggerOrderAlert(roomName, itemsSummary)
+                    triggerOrderAlert(roomName, itemsSummary, orderId)
                 }
             }
         } catch (t: Throwable) {
@@ -342,10 +310,11 @@ class OrderNotificationService : Service() {
         }
     }
 
-    private fun triggerOrderAlert(roomName: String, itemsSummary: String) {
+    private fun triggerOrderAlert(roomName: String, itemsSummary: String, orderId: Int = 0) {
         if (isMuted) {
             Log.d(TAG, "Sesli uyarı kapalı: Ses ve titreşim engellendi ($roomName).")
             val intent = Intent(BROADCAST_NEW_ORDER).apply {
+                putExtra("order_id", orderId)
                 putExtra("room_name", roomName)
                 putExtra("items_summary", itemsSummary)
                 putExtra("is_muted", true)
@@ -358,17 +327,18 @@ class OrderNotificationService : Service() {
         // 1. Ekranı Aç (Kilitli veya kapalıysa uyandır)
         wakeUpScreen()
 
-        // 2. Güçlü Titreşim Ver
+        // 2. Güçlü Titreşim Ver (Alarm düzeyinde)
         vibratePhone()
 
-        // 3. Doğrudan Zil Sesini Çal (Hoparlörden ses çıkışı garantisi)
+        // 3. Doğrudan Zil Sesini ve Alarm Tonunu Çal (Hoparlörden garanti çıkış)
         playAlarmRingtone()
 
         // 4. Durum Çubuğuna Yüksek Öncelikli Pop-up Bildirim Çıkar
         showOrderNotification(roomName, itemsSummary)
 
-        // 5. Activity'e anlık yayın gönder (ekran açıksa Toast & Yenileme için)
+        // 5. Activity'e anlık yayın gönder (ekran açıksa Pop-up & Yenileme için)
         val intent = Intent(BROADCAST_NEW_ORDER).apply {
+            putExtra("order_id", orderId)
             putExtra("room_name", roomName)
             putExtra("items_summary", itemsSummary)
             putExtra("is_muted", false)
@@ -378,10 +348,25 @@ class OrderNotificationService : Service() {
     }
 
     private fun playAlarmRingtone() {
+        // 1. ToneGenerator ile donanımsal alarm hoparlöründen ses çal (Sessiz modu deler)
+        try {
+            val toneGen = android.media.ToneGenerator(android.media.AudioManager.STREAM_ALARM, 100)
+            toneGen.startTone(android.media.ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 1200)
+        } catch (e: Exception) {
+            Log.e(TAG, "ToneGenerator error", e)
+        }
+
+        // 2. Ringtone ile alarm zil sesini çal
         try {
             val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                 ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             val ringtone = RingtoneManager.getRingtone(applicationContext, soundUri)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                ringtone.audioAttributes = AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 ringtone.isLooping = false
             }
@@ -394,11 +379,12 @@ class OrderNotificationService : Service() {
     private fun wakeUpScreen() {
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            @Suppress("DEPRECATION")
             val wakeLock = pm.newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
                 "makamservis:order_alert"
             )
-            wakeLock.acquire(4000)
+            wakeLock.acquire(5000)
         } catch (e: Exception) {
             Log.e(TAG, "Wakelock error", e)
         }
@@ -406,15 +392,23 @@ class OrderNotificationService : Service() {
 
     private fun vibratePhone() {
         try {
-            val pattern = longArrayOf(0, 600, 250, 600, 250, 800)
+            val pattern = longArrayOf(0, 700, 250, 700, 250, 900)
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                vibratorManager?.defaultVibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                vibratorManager?.defaultVibrator?.vibrate(
+                    VibrationEffect.createWaveform(pattern, -1),
+                    audioAttributes
+                )
             } else {
                 @Suppress("DEPRECATION")
                 val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1))
+                    vibrator?.vibrate(VibrationEffect.createWaveform(pattern, -1), audioAttributes)
                 } else {
                     @Suppress("DEPRECATION")
                     vibrator?.vibrate(pattern, -1)
