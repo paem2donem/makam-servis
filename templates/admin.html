@@ -2,6 +2,172 @@
 
 {% block title %}Yönetici Kontrol Paneli - Makam Servis{% endblock %}
 
+{% block head %}
+<style>
+/* QR Kartları Genel & Çıktı Standartları */
+.room-manage-card.qr-printable-card {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.room-manage-card.qr-printable-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+}
+
+@media print {
+    @page {
+        size: A4 portrait;
+        margin: 10mm 8mm;
+    }
+    html, body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        background-image: none !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    /* KESİNLİKLE ÇIKTIDA GÖRÜNMEYECEK ALANLAR (DÜZENLE KISIMLARI, BUTONLAR, TABLAR) */
+    .admin-banner-header, 
+    .segmented-tab-bar, 
+    .panel-header, 
+    .room-edit-box, 
+    .room-edit-form,
+    #newRoomForm,
+    #adminTabKitchen,
+    #adminTabProducts,
+    .floor-filter-toolbar,
+    button,
+    input,
+    select,
+    form,
+    details,
+    summary,
+    .btn-save-mini,
+    .btn-gradient-primary,
+    .btn-outline-primary,
+    .btn-action-edit,
+    .btn-action-delete,
+    .drag-hint-badge,
+    .drag-handle-grip,
+    .admin-status-badge,
+    .btn-admin-logout,
+    audio,
+    .toast { 
+        display: none !important; 
+        visibility: hidden !important;
+        height: 0 !important;
+        max-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        overflow: hidden !important;
+    }
+
+    .container, .admin-main-container {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    .glass-panel {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    
+    #adminTabRooms { 
+        display: block !important; 
+    }
+    
+    .rooms-cards-grid { 
+        display: grid !important; 
+        grid-template-columns: repeat(3, 1fr) !important; 
+        gap: 6mm !important; 
+        margin-bottom: 8mm !important;
+        page-break-inside: auto !important;
+    }
+    
+    .room-manage-card { 
+        box-shadow: none !important; 
+        padding: 12px !important; 
+        border-radius: 12px !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        margin-bottom: 0 !important;
+        text-align: center !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    .room-manage-header {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        margin-bottom: 8px !important;
+        padding-bottom: 6px !important;
+        border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+        text-align: left !important;
+    }
+    
+    .room-icon-badge {
+        display: flex !important;
+        width: 28px !important;
+        height: 28px !important;
+        border-radius: 6px !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 0.9rem !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    .room-current-title {
+        font-size: 0.92rem !important;
+        font-weight: 800 !important;
+    }
+
+    .theme-qr-box {
+        padding: 10px !important;
+        margin: 8px 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    
+    .qr-code-img { 
+        width: 140px !important; 
+        height: 140px !important; 
+        display: inline-block !important;
+    }
+
+    .print-section-title {
+        font-size: 1.05rem !important;
+        font-weight: 700 !important;
+        color: #1e293b !important;
+        margin: 6mm 0 3mm 0 !important;
+        padding-bottom: 2mm !important;
+        border-bottom: 1.5px solid #cbd5e1 !important;
+        page-break-after: avoid !important;
+        break-after: avoid !important;
+    }
+
+    /* Özel yazdırma filtreleri */
+    body.print-only-rooms #kitchenQrSection {
+        display: none !important;
+    }
+    body.print-only-kitchen #roomsQrSection {
+        display: none !important;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- PREMIUN BANNER HEADER -->
 <header class="admin-banner-header">
@@ -167,13 +333,21 @@
                     <h2 class="panel-title">📱 Odalar & Kat Mutfakları QR Kodları</h2>
                     <p class="panel-subtitle" style="margin-bottom: 0;">Her katın kendi mutfağı ve odaları için özel QR kodlar hazırlandı.</p>
                 </div>
-                <div style="display:flex; gap: 8px;">
+                <div style="display:flex; gap: 8px; flex-wrap: wrap;">
                     <button type="button" class="btn-gradient-primary" style="width: auto; padding: 8px 16px; font-size: 0.85rem; background: #10b981;" onclick="document.getElementById('newRoomForm').style.display = 'flex'">
                         ➕ Yeni Oda Ekle
                     </button>
                     <button type="button" class="btn-gradient-primary"
-                        style="width: auto; padding: 8px 16px; font-size: 0.85rem;" onclick="window.print()">
+                        style="width: auto; padding: 8px 16px; font-size: 0.85rem;" onclick="printAllQRs()">
                         🖨️ Tüm QR Kodları Yazdır
+                    </button>
+                    <button type="button" class="btn-outline-primary"
+                        style="width: auto; padding: 8px 16px; font-size: 0.85rem; background: #ffffff;" onclick="printRoomQRs()">
+                        🚪 Sadece Odaları Yazdır
+                    </button>
+                    <button type="button" class="btn-outline-primary"
+                        style="width: auto; padding: 8px 16px; font-size: 0.85rem; background: #ffffff;" onclick="printKitchenQRs()">
+                        👨‍🍳 Sadece Mutfakları Yazdır
                     </button>
                 </div>
             </div>
@@ -194,13 +368,13 @@
             </form>
 
             <!-- 1. BÖLÜM: KAT MUTFAKLARI QR KODLARI -->
-            <div style="margin-top: 25px;">
-                <h3 style="font-size: 1.1rem; color: #1e293b; display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+            <div id="kitchenQrSection" style="margin-top: 25px;">
+                <h3 class="print-section-title" style="font-size: 1.1rem; color: #1e293b; display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
                     <span>👨‍🍳</span> <span>Kat Mutfak Ekranı QR Kodları (Mutfak Personeli İçin)</span>
                 </h3>
                 <div class="rooms-cards-grid">
                     <!-- MAKAM MUTFAK -->
-                    <div class="room-manage-card qr-printable-card" style="border: 2px solid #312e81; background: #eef2ff;">
+                    <div class="room-manage-card qr-printable-card theme-makam" style="border: 2px solid #312e81; background: #eef2ff;">
                         <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <div class="room-icon-badge" style="background: #312e81; color: #fbbf24;">👑</div>
@@ -209,16 +383,19 @@
                                     <span style="color: #6366f1; font-size: 0.8rem; font-weight: 600; display: block;">/mutfak/makam</span>
                                 </div>
                             </div>
+                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: #312e81; border: 1px solid #312e81;">
+                                Mutfak Ekranı
+                            </span>
                         </div>
-                        <div style="background: #ffffff; border: 1px dashed #6366f1; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #6366f1; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
                             <img class="qr-code-img" data-slug="mutfak/makam" alt="Makam Mutfağı QR" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white;">
-                            <p style="font-size: 0.72rem; color: #312e81; margin-top: 6px; font-weight: 700;">Makam Mutfağı Ekranı</p>
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: #312e81; margin-top: 6px; font-weight: 700; margin-bottom: 0;">Makam Mutfağı Ekranı</p>
                         </div>
                     </div>
 
                     <!-- KAT 3 MUTFAK -->
-                    <div class="room-manage-card qr-printable-card" style="border: 2px solid #2563eb; background: #eff6ff;">
+                    <div class="room-manage-card qr-printable-card theme-kat-3" style="border: 2px solid #2563eb; background: #eff6ff;">
                         <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <div class="room-icon-badge" style="background: #2563eb; color: white;">🏢</div>
@@ -227,16 +404,19 @@
                                     <span style="color: #3b82f6; font-size: 0.8rem; font-weight: 600; display: block;">/mutfak/kat-3</span>
                                 </div>
                             </div>
+                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: #1d4ed8; border: 1px solid #2563eb;">
+                                Mutfak Ekranı
+                            </span>
                         </div>
-                        <div style="background: #ffffff; border: 1px dashed #3b82f6; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #3b82f6; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
                             <img class="qr-code-img" data-slug="mutfak/kat-3" alt="3. Kat Mutfağı QR" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white;">
-                            <p style="font-size: 0.72rem; color: #1d4ed8; margin-top: 6px; font-weight: 700;">3. Kat Mutfağı Ekranı</p>
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: #1d4ed8; margin-top: 6px; font-weight: 700; margin-bottom: 0;">3. Kat Mutfağı Ekranı</p>
                         </div>
                     </div>
 
                     <!-- KAT 4 MUTFAK -->
-                    <div class="room-manage-card qr-printable-card" style="border: 2px solid #059669; background: #ecfdf5;">
+                    <div class="room-manage-card qr-printable-card theme-kat-4" style="border: 2px solid #059669; background: #ecfdf5;">
                         <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <div class="room-icon-badge" style="background: #059669; color: white;">🏢</div>
@@ -245,16 +425,19 @@
                                     <span style="color: #10b981; font-size: 0.8rem; font-weight: 600; display: block;">/mutfak/kat-4</span>
                                 </div>
                             </div>
+                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: #047857; border: 1px solid #059669;">
+                                Mutfak Ekranı
+                            </span>
                         </div>
-                        <div style="background: #ffffff; border: 1px dashed #10b981; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #10b981; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
                             <img class="qr-code-img" data-slug="mutfak/kat-4" alt="4. Kat Mutfağı QR" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white;">
-                            <p style="font-size: 0.72rem; color: #047857; margin-top: 6px; font-weight: 700;">4. Kat Mutfağı Ekranı</p>
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: #047857; margin-top: 6px; font-weight: 700; margin-bottom: 0;">4. Kat Mutfağı Ekranı</p>
                         </div>
                     </div>
 
                     <!-- KAT 5 MUTFAK -->
-                    <div class="room-manage-card qr-printable-card" style="border: 2px solid #d97706; background: #fffbeb;">
+                    <div class="room-manage-card qr-printable-card theme-kat-5" style="border: 2px solid #d97706; background: #fffbeb;">
                         <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <div class="room-icon-badge" style="background: #d97706; color: white;">🏢</div>
@@ -263,16 +446,19 @@
                                     <span style="color: #f59e0b; font-size: 0.8rem; font-weight: 600; display: block;">/mutfak/kat-5</span>
                                 </div>
                             </div>
+                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: #b45309; border: 1px solid #d97706;">
+                                Mutfak Ekranı
+                            </span>
                         </div>
-                        <div style="background: #ffffff; border: 1px dashed #f59e0b; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #f59e0b; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
                             <img class="qr-code-img" data-slug="mutfak/kat-5" alt="5. Kat Mutfağı QR" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white;">
-                            <p style="font-size: 0.72rem; color: #b45309; margin-top: 6px; font-weight: 700;">5. Kat Mutfağı Ekranı</p>
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: #b45309; margin-top: 6px; font-weight: 700; margin-bottom: 0;">5. Kat Mutfağı Ekranı</p>
                         </div>
                     </div>
 
                     <!-- KAT 6 MUTFAK -->
-                    <div class="room-manage-card qr-printable-card" style="border: 2px solid #7c3aed; background: #f5f3ff;">
+                    <div class="room-manage-card qr-printable-card theme-kat-6" style="border: 2px solid #7c3aed; background: #f5f3ff;">
                         <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <div class="room-icon-badge" style="background: #7c3aed; color: white;">🏢</div>
@@ -281,79 +467,140 @@
                                     <span style="color: #8b5cf6; font-size: 0.8rem; font-weight: 600; display: block;">/mutfak/kat-6</span>
                                 </div>
                             </div>
+                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: #6d28d9; border: 1px solid #7c3aed;">
+                                Mutfak Ekranı
+                            </span>
                         </div>
-                        <div style="background: #ffffff; border: 1px dashed #8b5cf6; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #8b5cf6; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
                             <img class="qr-code-img" data-slug="mutfak/kat-6" alt="6. Kat Mutfağı QR" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white;">
-                            <p style="font-size: 0.72rem; color: #6d28d9; margin-top: 6px; font-weight: 700;">6. Kat Mutfağı Ekranı</p>
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: #6d28d9; margin-top: 6px; font-weight: 700; margin-bottom: 0;">6. Kat Mutfağı Ekranı</p>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- 2. BÖLÜM: ODALARIN QR KODLARI VE KAT ATAMALARI -->
-            <div style="margin-top: 35px;">
-                <h3 style="font-size: 1.1rem; color: #1e293b; display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
-                    <span>🚪</span> <span>Oda QR Kodları & Kat Eşleştirmesi (Makam & Ofisler)</span>
+            <div id="roomsQrSection" style="margin-top: 35px;">
+                <h3 class="print-section-title" style="font-size: 1.1rem; color: #1e293b; display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                    <span>🚪</span> <span>Oda QR Kodları (Makam & Ofisler)</span>
                 </h3>
 
                 <div class="rooms-cards-grid" style="margin-top: 15px;">
                     {% for r in rooms %}
-                    <div class="room-manage-card qr-printable-card">
+                    {% if r.floor == 'makam' %}
+                        {% set border_col = '#312e81' %}
+                        {% set bg_col = '#eef2ff' %}
+                        {% set badge_bg = '#312e81' %}
+                        {% set badge_col = '#fbbf24' %}
+                        {% set title_col = '#312e81' %}
+                        {% set sub_col = '#6366f1' %}
+                        {% set qr_dash = '#6366f1' %}
+                        {% set icon_char = '👑' %}
+                        {% set floor_label = 'Makam Katı' %}
+                    {% elif r.floor == 'kat-3' %}
+                        {% set border_col = '#2563eb' %}
+                        {% set bg_col = '#eff6ff' %}
+                        {% set badge_bg = '#2563eb' %}
+                        {% set badge_col = '#ffffff' %}
+                        {% set title_col = '#1d4ed8' %}
+                        {% set sub_col = '#3b82f6' %}
+                        {% set qr_dash = '#3b82f6' %}
+                        {% set icon_char = '🏢' %}
+                        {% set floor_label = '3. Kat' %}
+                    {% elif r.floor == 'kat-4' %}
+                        {% set border_col = '#059669' %}
+                        {% set bg_col = '#ecfdf5' %}
+                        {% set badge_bg = '#059669' %}
+                        {% set badge_col = '#ffffff' %}
+                        {% set title_col = '#047857' %}
+                        {% set sub_col = '#10b981' %}
+                        {% set qr_dash = '#10b981' %}
+                        {% set icon_char = '🏢' %}
+                        {% set floor_label = '4. Kat' %}
+                    {% elif r.floor == 'kat-5' %}
+                        {% set border_col = '#d97706' %}
+                        {% set bg_col = '#fffbeb' %}
+                        {% set badge_bg = '#d97706' %}
+                        {% set badge_col = '#ffffff' %}
+                        {% set title_col = '#b45309' %}
+                        {% set sub_col = '#f59e0b' %}
+                        {% set qr_dash = '#f59e0b' %}
+                        {% set icon_char = '🏢' %}
+                        {% set floor_label = '5. Kat' %}
+                    {% else %}
+                        {% set border_col = '#7c3aed' %}
+                        {% set bg_col = '#f5f3ff' %}
+                        {% set badge_bg = '#7c3aed' %}
+                        {% set badge_col = '#ffffff' %}
+                        {% set title_col = '#6d28d9' %}
+                        {% set sub_col = '#8b5cf6' %}
+                        {% set qr_dash = '#8b5cf6' %}
+                        {% set icon_char = '🏢' %}
+                        {% set floor_label = '6. Kat' %}
+                    {% endif %}
+
+                    <div class="room-manage-card qr-printable-card theme-{{ r.floor }}" style="border: 2px solid {{ border_col }}; background: {{ bg_col }};">
                         <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <div class="room-icon-badge">{% if r.floor == 'makam' %}👑{% else %}🚪{% endif %}</div>
+                                <div class="room-icon-badge" style="background: {{ badge_bg }}; color: {{ badge_col }};">{{ icon_char }}</div>
                                 <div>
-                                    <a href="/{{ r.slug }}" target="_blank" class="room-current-title" style="text-decoration:none; color:inherit; cursor:pointer;">{{ r.name }}</a>
-                                    <span style="color: #64748b; font-size: 0.8rem; font-weight: 500; margin-left: 4px;">(/{{ r.slug }})</span>
+                                    <a href="/{{ r.slug }}" target="_blank" class="room-current-title" style="color: {{ title_col }}; font-weight: 800; text-decoration: none;">{{ r.name }}</a>
+                                    <span style="color: {{ sub_col }}; font-size: 0.8rem; font-weight: 600; display: block;">/{{ r.slug }}</span>
                                 </div>
                             </div>
-                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; background: {% if r.floor == 'makam' %}#fef3c7; color: #92400e;{% elif r.floor == 'kat-3' %}#dbeafe; color: #1e40af;{% elif r.floor == 'kat-4' %}#d1fae5; color: #065f46;{% elif r.floor == 'kat-5' %}#fef3c7; color: #78350f;{% else %}#ede9fe; color: #5b21b6;{% endif %}">
-                                {{ floors.get(r.floor, 'Makam Katı') }}
+                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: {{ title_col }}; border: 1px solid {{ border_col }};">
+                                {{ floor_label }}
                             </span>
                         </div>
 
-                        <!-- ODA QR KOD ALANI -->
-                        <div style="background: #ffffff; border: 1px dashed #cbd5e1; padding: 15px; border-radius: 12px; text-align: center; margin: 10px 0;">
-                            <img class="qr-code-img" data-slug="{{ r.slug }}" alt="{{ r.name }} QR Kodu" width="160"
-                                height="160" style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white;">
-                            <p style="font-size: 0.75rem; color: #64748b; margin-top: 6px; font-weight: 600;">Sipariş Vermek İçin Okutun</p>
+                        <!-- ODA QR KOD ALANI (Mutfak kartı ile birebir aynı standart) -->
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed {{ qr_dash }}; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
+                            <img class="qr-code-img" data-slug="{{ r.slug }}" alt="{{ r.name }} QR Kodu" width="150" height="150"
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: {{ title_col }}; margin-top: 6px; font-weight: 700; margin-bottom: 0;">Sipariş Vermek İçin Okutun</p>
                         </div>
 
-                        <div class="room-edit-box">
-                            <form onsubmit="updateRoom(event, {{ r.id }})" class="room-edit-form" style="display: flex; flex-direction: column; gap: 8px;">
-                                <div>
-                                    <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 2px; color: #475569; font-weight: 600;">Oda İsmi:</label>
-                                    <input type="text" id="roomInput-{{ r.id }}" value="{{ r.name }}"
-                                        class="form-input-custom inline-input" style="font-size: 0.85rem; width: 100%; box-sizing: border-box;" required placeholder="Örn: Onur Abi">
-                                </div>
-                                
-                                <div>
-                                    <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 2px; color: #475569; font-weight: 600;">Sayfa Linki (URL):</label>
-                                    <div style="display: flex; align-items: center; background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding-left: 8px; box-sizing: border-box;">
-                                        <span style="color: #64748b; font-size: 0.85rem; font-weight: 700;">/</span>
-                                        <input type="text" id="roomSlug-{{ r.id }}" value="{{ r.slug }}"
-                                            class="inline-input" style="border: none; outline: none; font-size: 0.85rem; padding: 6px 8px; width: 100%; color: #0f172a; font-weight: 600;" required placeholder="Örn: kat5-C">
+                        <!-- DÜZENLE KISMI (SADECE EKRANDA GÖRÜNÜR, ÇIKTIDA KESİNLİKLE GÖRÜNMEZ) -->
+                        <div class="room-edit-box" style="margin-top: 10px; border-top: 1px dashed rgba(0,0,0,0.12); padding-top: 8px;">
+                            <details>
+                                <summary style="font-size: 0.76rem; font-weight: 700; color: #475569; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 5px 8px; background: rgba(0,0,0,0.04); border-radius: 6px;">
+                                    <span>⚙️ Odayı Düzenle / Ayarlar</span>
+                                </summary>
+                                <form onsubmit="updateRoom(event, {{ r.id }})" class="room-edit-form" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px; text-align: left;">
+                                    <div>
+                                        <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 2px; color: #475569; font-weight: 600;">Oda İsmi:</label>
+                                        <input type="text" id="roomInput-{{ r.id }}" value="{{ r.name }}"
+                                            class="form-input-custom inline-input" style="font-size: 0.85rem; width: 100%; box-sizing: border-box;" required placeholder="Örn: Onur Amir">
                                     </div>
-                                    <span style="font-size: 0.68rem; color: #94a3b8; display: block; margin-top: 2px;">Örnek: kat5-C yazarsanız link /kat5-C olur.</span>
-                                </div>
-                                
-                                <div>
-                                    <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 2px; color: #475569; font-weight: 600;">Bağlı Olduğu Kat Mutfağı:</label>
-                                    <select id="roomFloor-{{ r.id }}" class="form-input-custom inline-input" style="font-size: 0.85rem; width: 100%; box-sizing: border-box;">
-                                        <option value="makam" {% if r.floor == 'makam' or not r.floor %}selected{% endif %}>👑 Makam Katı Mutfağı</option>
-                                        <option value="kat-3" {% if r.floor == 'kat-3' %}selected{% endif %}>🏢 3. Kat Mutfağı</option>
-                                        <option value="kat-4" {% if r.floor == 'kat-4' %}selected{% endif %}>🏢 4. Kat Mutfağı</option>
-                                        <option value="kat-5" {% if r.floor == 'kat-5' %}selected{% endif %}>🏢 5. Kat Mutfağı</option>
-                                        <option value="kat-6" {% if r.floor == 'kat-6' %}selected{% endif %}>🏢 6. Kat Mutfağı</option>
-                                    </select>
-                                </div>
-                                
-                                <div style="display: flex; gap: 6px; margin-top: 2px;">
-                                    <button type="submit" class="btn-save-mini" style="flex: 1;">💾 Kaydet</button>
-                                    <button type="button" class="btn-save-mini" style="background: #ef4444; width: auto; padding: 6px 12px;" onclick="deleteRoom({{ r.id }})">Sil</button>
-                                </div>
-                            </form>
+                                    
+                                    <div>
+                                        <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 2px; color: #475569; font-weight: 600;">Sayfa Linki (URL):</label>
+                                        <div style="display: flex; align-items: center; background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding-left: 8px; box-sizing: border-box;">
+                                            <span style="color: #64748b; font-size: 0.85rem; font-weight: 700;">/</span>
+                                            <input type="text" id="roomSlug-{{ r.id }}" value="{{ r.slug }}"
+                                                class="inline-input" style="border: none; outline: none; font-size: 0.85rem; padding: 6px 8px; width: 100%; color: #0f172a; font-weight: 600;" required placeholder="Örn: kat5-C">
+                                        </div>
+                                        <span style="font-size: 0.68rem; color: #94a3b8; display: block; margin-top: 2px;">Örnek: kat5-C yazarsanız link /kat5-C olur.</span>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="form-label-custom" style="font-size: 0.72rem; margin-bottom: 2px; color: #475569; font-weight: 600;">Bağlı Olduğu Kat Mutfağı:</label>
+                                        <select id="roomFloor-{{ r.id }}" class="form-input-custom inline-input" style="font-size: 0.85rem; width: 100%; box-sizing: border-box;">
+                                            <option value="makam" {% if r.floor == 'makam' or not r.floor %}selected{% endif %}>👑 Makam Katı Mutfağı</option>
+                                            <option value="kat-3" {% if r.floor == 'kat-3' %}selected{% endif %}>🏢 3. Kat Mutfağı</option>
+                                            <option value="kat-4" {% if r.floor == 'kat-4' %}selected{% endif %}>🏢 4. Kat Mutfağı</option>
+                                            <option value="kat-5" {% if r.floor == 'kat-5' %}selected{% endif %}>🏢 5. Kat Mutfağı</option>
+                                            <option value="kat-6" {% if r.floor == 'kat-6' %}selected{% endif %}>🏢 6. Kat Mutfağı</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div style="display: flex; gap: 6px; margin-top: 2px;">
+                                        <button type="submit" class="btn-save-mini" style="flex: 1;">💾 Kaydet</button>
+                                        <button type="button" class="btn-save-mini" style="background: #ef4444; width: auto; padding: 6px 12px;" onclick="deleteRoom({{ r.id }})">Sil</button>
+                                    </div>
+                                </form>
+                            </details>
                         </div>
                     </div>
                     {% endfor %}
@@ -389,6 +636,30 @@
             const targetUrl = `${baseUrl}/${slug}`;
             img.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(targetUrl)}`;
         });
+    }
+
+    // QR YAZDIRMA FONKSİYONLARI
+    function printAllQRs() {
+        document.body.classList.remove('print-only-rooms', 'print-only-kitchen');
+        window.print();
+    }
+
+    function printRoomQRs() {
+        document.body.classList.remove('print-only-kitchen');
+        document.body.classList.add('print-only-rooms');
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('print-only-rooms');
+        }, 1500);
+    }
+
+    function printKitchenQRs() {
+        document.body.classList.remove('print-only-rooms');
+        document.body.classList.add('print-only-kitchen');
+        window.print();
+        setTimeout(() => {
+            document.body.classList.remove('print-only-kitchen');
+        }, 1500);
     }
 
     // TAB DEĞİŞTİRME
