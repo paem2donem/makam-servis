@@ -10,15 +10,28 @@ android {
     defaultConfig {
         applicationId = "com.example.makamservis"
         minSdk = 24
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 34
+        versionCode = 2
+        versionName = "1.0.1"
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("makam-servis.jks")
+            storePassword = "makamservispass"
+            keyAlias = "makamservis"
+            keyPassword = "makamservispass"
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+        debug {
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
