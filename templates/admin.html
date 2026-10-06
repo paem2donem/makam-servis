@@ -2,8 +2,7 @@
 
 {% block title %}Yönetici Kontrol Paneli - Makam Servis{% endblock %}
 
-{% block head %}
-<style>
+{% block head %}<style>
 /* QR Kartları Genel & Çıktı Standartları */
 .room-manage-card.qr-printable-card {
     transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -12,12 +11,19 @@
     transform: translateY(-2px);
     box-shadow: 0 8px 20px rgba(0,0,0,0.06);
 }
+.kitchen-clickable-card {
+    cursor: pointer;
+}
+.kitchen-clickable-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.09) !important;
+}
 
 /* Sürükle - Bırak (Drag & Drop) Efektleri */
 .drag-room-card {
     cursor: grab;
     user-select: none;
-    transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s ease, opacity 0.18s ease;
+    transition: transform 0.18s cubic-bezier(0.2, 0, 1), box-shadow 0.18s ease, opacity 0.18s ease;
 }
 .drag-room-card:active {
     cursor: grabbing;
@@ -38,10 +44,23 @@
     color: #3b82f6;
 }
 
+/* Tek satır, asla alta taşmayan şık sayfa linki */
+.card-url-link {
+    font-size: 0.74rem;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: block !important;
+    max-width: 100% !important;
+    line-height: 1.25;
+}
+
 @media print {
     @page {
         size: A4 portrait;
-        margin: 10mm 8mm;
+        margin: 6mm 6mm !important;
     }
     html, body {
         background: #ffffff !important;
@@ -78,6 +97,7 @@
     .btn-action-delete,
     .drag-hint-badge,
     .drag-handle-grip,
+    .room-cat-badge,
     .admin-status-badge,
     .btn-admin-logout,
     audio,
@@ -111,22 +131,26 @@
         display: block !important; 
     }
     
+    /* 3 Sütunlu Kompakt & Ekonomik Izgara */
     .rooms-cards-grid { 
         display: grid !important; 
         grid-template-columns: repeat(3, 1fr) !important; 
-        gap: 6mm !important; 
-        margin-bottom: 8mm !important;
+        gap: 3.5mm 3.5mm !important; 
+        margin-bottom: 2mm !important;
         page-break-inside: auto !important;
     }
     
+    /* Şık, Kompakt, Sayfa Taşmayan Kart Tasarımı */
     .room-manage-card { 
         box-shadow: none !important; 
-        padding: 12px !important; 
-        border-radius: 12px !important;
+        padding: 5px 6px !important; 
+        border-radius: 8px !important;
+        border-width: 1.5px !important;
         page-break-inside: avoid !important;
         break-inside: avoid !important;
         margin-bottom: 0 !important;
         text-align: center !important;
+        background: #ffffff !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
@@ -134,50 +158,77 @@
     .room-manage-header {
         display: flex !important;
         align-items: center !important;
-        justify-content: space-between !important;
-        margin-bottom: 8px !important;
-        padding-bottom: 6px !important;
+        justify-content: flex-start !important;
+        gap: 5px !important;
+        margin-bottom: 3px !important;
+        padding-bottom: 3px !important;
         border-bottom: 1px solid rgba(0,0,0,0.08) !important;
         text-align: left !important;
     }
     
     .room-icon-badge {
         display: flex !important;
-        width: 28px !important;
-        height: 28px !important;
-        border-radius: 6px !important;
+        width: 22px !important;
+        height: 22px !important;
+        border-radius: 4px !important;
         align-items: center !important;
         justify-content: center !important;
-        font-size: 0.9rem !important;
+        font-size: 0.78rem !important;
+        flex-shrink: 0 !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
     
     .room-current-title {
-        font-size: 0.92rem !important;
+        font-size: 0.82rem !important;
         font-weight: 800 !important;
+        line-height: 1.15 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .card-url-link {
+        font-size: 0.66rem !important;
+        font-weight: 600 !important;
+        font-family: ui-monospace, monospace !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: block !important;
+        color: #475569 !important;
     }
 
     .theme-qr-box {
-        padding: 10px !important;
-        margin: 8px 0 !important;
+        padding: 3px !important;
+        margin: 3px 0 !important;
+        border-radius: 6px !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
     
     .qr-code-img { 
-        width: 140px !important; 
-        height: 140px !important; 
+        width: 96px !important; 
+        height: 96px !important; 
         display: inline-block !important;
+        padding: 2px !important;
+    }
+
+    .theme-caption {
+        font-size: 0.66rem !important;
+        font-weight: 700 !important;
+        margin-top: 2px !important;
+        margin-bottom: 0 !important;
+        line-height: 1.1 !important;
     }
 
     .print-section-title {
-        font-size: 1.05rem !important;
-        font-weight: 700 !important;
+        font-size: 0.80rem !important;
+        font-weight: 800 !important;
         color: #1e293b !important;
-        margin: 6mm 0 3mm 0 !important;
-        padding-bottom: 2mm !important;
-        border-bottom: 1.5px solid #cbd5e1 !important;
+        margin: 2mm 0 1.5mm 0 !important;
+        padding-bottom: 1mm !important;
+        border-bottom: 1px solid #cbd5e1 !important;
         page-break-after: avoid !important;
         break-after: avoid !important;
     }
@@ -363,8 +414,8 @@
                         ➕ Yeni Oda Ekle
                     </button>
                     <button type="button" class="btn-gradient-primary"
-                        style="width: auto; padding: 8px 16px; font-size: 0.85rem;" onclick="printAllQRs()">
-                        🖨️ Tüm QR Kodları Yazdır
+                        style="width: auto; padding: 8px 16px; font-size: 0.85rem;" onclick="printAllQRs()" title="Tüm mutfak ve oda QR kodlarını 2 sayfaya sığacak şekilde ekonomik yazdırır">
+                        🖨️ Tüm QR Kodları Yazdır (2 Sayfa)
                     </button>
                     <button type="button" class="btn-outline-primary"
                         style="width: auto; padding: 8px 16px; font-size: 0.85rem; background: #ffffff;" onclick="printRoomQRs()">
@@ -394,112 +445,87 @@
 
             <!-- 1. BÖLÜM: KAT MUTFAKLARI QR KODLARI -->
             <div id="kitchenQrSection" style="margin-top: 25px;">
-                <h3 class="print-section-title" style="font-size: 1.1rem; color: #1e293b; display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                <h3 class="print-section-title" style="font-size: 1.05rem; color: #1e293b; display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
                     <span>👨‍🍳</span> <span>Kat Mutfak Ekranı QR Kodları (Mutfak Personeli İçin)</span>
                 </h3>
                 <div class="rooms-cards-grid">
                     <!-- MAKAM MUTFAK -->
-                    <div class="room-manage-card qr-printable-card theme-makam" style="border: 2px solid #312e81; background: #eef2ff;">
-                        <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <div class="room-icon-badge" style="background: #312e81; color: #fbbf24;">👑</div>
-                                <div>
-                                    <a href="/mutfak/makam" target="_blank" class="room-current-title" style="color: #312e81; font-weight: 800; text-decoration: none;">Makam Katı Mutfağı</a>
-                                    <span style="color: #6366f1; font-size: 0.8rem; font-weight: 600; display: block;">/mutfak/makam</span>
-                                </div>
+                    <div class="room-manage-card qr-printable-card kitchen-clickable-card theme-makam" onclick="window.open('/mutfak/makam', '_blank')" title="Makam Katı Mutfak Ekranını Aç (Tıklayın)" style="border: 2px solid #312e81; background: #eef2ff; cursor: pointer;">
+                        <div class="room-manage-header" style="display: flex; align-items: center; gap: 8px;">
+                            <div class="room-icon-badge" style="background: #312e81; color: #fbbf24;">👑</div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="room-current-title" style="color: #312e81; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Makam Katı Mutfağı</div>
+                                <span class="card-url-link" style="color: #6366f1;">/mutfak/makam</span>
                             </div>
-                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: #312e81; border: 1px solid #312e81;">
-                                Mutfak Ekranı
-                            </span>
                         </div>
-                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #6366f1; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
-                            <img class="qr-code-img" data-slug="mutfak/makam" alt="Makam Mutfağı QR" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
-                            <p class="theme-caption" style="font-size: 0.72rem; color: #312e81; margin-top: 6px; font-weight: 700; margin-bottom: 0;">Makam Mutfağı Ekranı</p>
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #6366f1; padding: 10px; border-radius: 12px; text-align: center; margin: 8px 0;">
+                            <img class="qr-code-img" data-slug="mutfak/makam" alt="Makam Mutfağı QR" width="130" height="130"
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 3px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: #312e81; margin-top: 4px; font-weight: 700; margin-bottom: 0;">Makam Katı Mutfak Ekranı</p>
                         </div>
                     </div>
 
                     <!-- KAT 3 MUTFAK -->
-                    <div class="room-manage-card qr-printable-card theme-kat-3" style="border: 2px solid #2563eb; background: #eff6ff;">
-                        <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <div class="room-icon-badge" style="background: #2563eb; color: white;">🏢</div>
-                                <div>
-                                    <a href="/mutfak/kat-3" target="_blank" class="room-current-title" style="color: #1d4ed8; font-weight: 800; text-decoration: none;">3. Kat Mutfağı</a>
-                                    <span style="color: #3b82f6; font-size: 0.8rem; font-weight: 600; display: block;">/mutfak/kat-3</span>
-                                </div>
+                    <div class="room-manage-card qr-printable-card kitchen-clickable-card theme-kat-3" onclick="window.open('/mutfak/kat-3', '_blank')" title="3. Kat Mutfak Ekranını Aç (Tıklayın)" style="border: 2px solid #2563eb; background: #eff6ff; cursor: pointer;">
+                        <div class="room-manage-header" style="display: flex; align-items: center; gap: 8px;">
+                            <div class="room-icon-badge" style="background: #2563eb; color: white;">🏢</div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="room-current-title" style="color: #1d4ed8; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">3. Kat Mutfağı</div>
+                                <span class="card-url-link" style="color: #3b82f6;">/mutfak/kat-3</span>
                             </div>
-                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: #1d4ed8; border: 1px solid #2563eb;">
-                                Mutfak Ekranı
-                            </span>
                         </div>
-                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #3b82f6; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
-                            <img class="qr-code-img" data-slug="mutfak/kat-3" alt="3. Kat Mutfağı QR" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
-                            <p class="theme-caption" style="font-size: 0.72rem; color: #1d4ed8; margin-top: 6px; font-weight: 700; margin-bottom: 0;">3. Kat Mutfağı Ekranı</p>
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #3b82f6; padding: 10px; border-radius: 12px; text-align: center; margin: 8px 0;">
+                            <img class="qr-code-img" data-slug="mutfak/kat-3" alt="3. Kat Mutfağı QR" width="130" height="130"
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 3px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: #1d4ed8; margin-top: 4px; font-weight: 700; margin-bottom: 0;">3. Kat Mutfak Ekranı</p>
                         </div>
                     </div>
 
                     <!-- KAT 4 MUTFAK -->
-                    <div class="room-manage-card qr-printable-card theme-kat-4" style="border: 2px solid #059669; background: #ecfdf5;">
-                        <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <div class="room-icon-badge" style="background: #059669; color: white;">🏢</div>
-                                <div>
-                                    <a href="/mutfak/kat-4" target="_blank" class="room-current-title" style="color: #047857; font-weight: 800; text-decoration: none;">4. Kat Mutfağı</a>
-                                    <span style="color: #10b981; font-size: 0.8rem; font-weight: 600; display: block;">/mutfak/kat-4</span>
-                                </div>
+                    <div class="room-manage-card qr-printable-card kitchen-clickable-card theme-kat-4" onclick="window.open('/mutfak/kat-4', '_blank')" title="4. Kat Mutfak Ekranını Aç (Tıklayın)" style="border: 2px solid #059669; background: #ecfdf5; cursor: pointer;">
+                        <div class="room-manage-header" style="display: flex; align-items: center; gap: 8px;">
+                            <div class="room-icon-badge" style="background: #059669; color: white;">🏢</div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="room-current-title" style="color: #047857; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">4. Kat Mutfağı</div>
+                                <span class="card-url-link" style="color: #10b981;">/mutfak/kat-4</span>
                             </div>
-                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: #047857; border: 1px solid #059669;">
-                                Mutfak Ekranı
-                            </span>
                         </div>
-                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #10b981; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
-                            <img class="qr-code-img" data-slug="mutfak/kat-4" alt="4. Kat Mutfağı QR" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
-                            <p class="theme-caption" style="font-size: 0.72rem; color: #047857; margin-top: 6px; font-weight: 700; margin-bottom: 0;">4. Kat Mutfağı Ekranı</p>
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #10b981; padding: 10px; border-radius: 12px; text-align: center; margin: 8px 0;">
+                            <img class="qr-code-img" data-slug="mutfak/kat-4" alt="4. Kat Mutfağı QR" width="130" height="130"
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 3px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: #047857; margin-top: 4px; font-weight: 700; margin-bottom: 0;">4. Kat Mutfak Ekranı</p>
                         </div>
                     </div>
 
                     <!-- KAT 5 MUTFAK -->
-                    <div class="room-manage-card qr-printable-card theme-kat-5" style="border: 2px solid #d97706; background: #fffbeb;">
-                        <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <div class="room-icon-badge" style="background: #d97706; color: white;">🏢</div>
-                                <div>
-                                    <a href="/mutfak/kat-5" target="_blank" class="room-current-title" style="color: #b45309; font-weight: 800; text-decoration: none;">5. Kat Mutfağı</a>
-                                    <span style="color: #f59e0b; font-size: 0.8rem; font-weight: 600; display: block;">/mutfak/kat-5</span>
-                                </div>
+                    <div class="room-manage-card qr-printable-card kitchen-clickable-card theme-kat-5" onclick="window.open('/mutfak/kat-5', '_blank')" title="5. Kat Mutfak Ekranını Aç (Tıklayın)" style="border: 2px solid #d97706; background: #fffbeb; cursor: pointer;">
+                        <div class="room-manage-header" style="display: flex; align-items: center; gap: 8px;">
+                            <div class="room-icon-badge" style="background: #d97706; color: white;">🏢</div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="room-current-title" style="color: #b45309; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">5. Kat Mutfağı</div>
+                                <span class="card-url-link" style="color: #f59e0b;">/mutfak/kat-5</span>
                             </div>
-                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: #b45309; border: 1px solid #d97706;">
-                                Mutfak Ekranı
-                            </span>
                         </div>
-                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #f59e0b; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
-                            <img class="qr-code-img" data-slug="mutfak/kat-5" alt="5. Kat Mutfağı QR" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
-                            <p class="theme-caption" style="font-size: 0.72rem; color: #b45309; margin-top: 6px; font-weight: 700; margin-bottom: 0;">5. Kat Mutfağı Ekranı</p>
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #f59e0b; padding: 10px; border-radius: 12px; text-align: center; margin: 8px 0;">
+                            <img class="qr-code-img" data-slug="mutfak/kat-5" alt="5. Kat Mutfağı QR" width="130" height="130"
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 3px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: #b45309; margin-top: 4px; font-weight: 700; margin-bottom: 0;">5. Kat Mutfak Ekranı</p>
                         </div>
                     </div>
 
                     <!-- KAT 6 MUTFAK -->
-                    <div class="room-manage-card qr-printable-card theme-kat-6" style="border: 2px solid #7c3aed; background: #f5f3ff;">
-                        <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <div class="room-icon-badge" style="background: #7c3aed; color: white;">🏢</div>
-                                <div>
-                                    <a href="/mutfak/kat-6" target="_blank" class="room-current-title" style="color: #6d28d9; font-weight: 800; text-decoration: none;">6. Kat Mutfağı</a>
-                                    <span style="color: #8b5cf6; font-size: 0.8rem; font-weight: 600; display: block;">/mutfak/kat-6</span>
-                                </div>
+                    <div class="room-manage-card qr-printable-card kitchen-clickable-card theme-kat-6" onclick="window.open('/mutfak/kat-6', '_blank')" title="6. Kat Mutfak Ekranını Aç (Tıklayın)" style="border: 2px solid #7c3aed; background: #f5f3ff; cursor: pointer;">
+                        <div class="room-manage-header" style="display: flex; align-items: center; gap: 8px;">
+                            <div class="room-icon-badge" style="background: #7c3aed; color: white;">🏢</div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div class="room-current-title" style="color: #6d28d9; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">6. Kat Mutfağı</div>
+                                <span class="card-url-link" style="color: #8b5cf6;">/mutfak/kat-6</span>
                             </div>
-                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: #6d28d9; border: 1px solid #7c3aed;">
-                                Mutfak Ekranı
-                            </span>
                         </div>
-                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #8b5cf6; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
-                            <img class="qr-code-img" data-slug="mutfak/kat-6" alt="6. Kat Mutfağı QR" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
-                            <p class="theme-caption" style="font-size: 0.72rem; color: #6d28d9; margin-top: 6px; font-weight: 700; margin-bottom: 0;">6. Kat Mutfağı Ekranı</p>
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed #8b5cf6; padding: 10px; border-radius: 12px; text-align: center; margin: 8px 0;">
+                            <img class="qr-code-img" data-slug="mutfak/kat-6" alt="6. Kat Mutfağı QR" width="130" height="130"
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 3px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: #6d28d9; margin-top: 4px; font-weight: 700; margin-bottom: 0;">6. Kat Mutfak Ekranı</p>
                         </div>
                     </div>
                 </div>
@@ -572,28 +598,28 @@
 
                     <div class="room-manage-card qr-printable-card theme-{{ r.floor }} drag-room-card" draggable="true" data-id="{{ r.id }}" style="border: 2px solid {{ border_col }}; background: {{ bg_col }};">
                         <div class="room-manage-header" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 6px;">
+                            <div style="display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0;">
                                 <span class="drag-handle-grip" title="Sıralamak için sürükleyin">⋮⋮</span>
                                 <div class="room-icon-badge" style="background: {{ badge_bg }}; color: {{ badge_col }};">{{ icon_char }}</div>
-                                <div>
-                                    <a href="/{{ r.slug }}" target="_blank" class="room-current-title" style="color: {{ title_col }}; font-weight: 800; text-decoration: none;">{{ r.name }}</a>
-                                    <span style="color: {{ sub_col }}; font-size: 0.8rem; font-weight: 600; display: block;">/{{ r.slug }}</span>
+                                <div style="flex: 1; min-width: 0;">
+                                    <a href="/{{ r.slug }}" target="_blank" class="room-current-title" style="color: {{ title_col }}; font-weight: 800; text-decoration: none; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ r.name }}</a>
+                                    <span class="card-url-link" style="color: {{ sub_col }};">/{{ r.slug }}</span>
                                 </div>
                             </div>
-                            <span class="room-cat-badge" style="padding: 3px 8px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; background: #ffffff; color: {{ title_col }}; border: 1px solid {{ border_col }};">
+                            <span class="room-cat-badge" style="padding: 2px 7px; border-radius: 6px; font-size: 0.70rem; font-weight: 700; background: #ffffff; color: {{ title_col }}; border: 1px solid {{ border_col }}; white-space: nowrap; flex-shrink: 0; margin-left: 4px;">
                                 {{ floor_label }}
                             </span>
                         </div>
 
                         <!-- ODA QR KOD ALANI (Mutfak kartı ile birebir aynı standart) -->
-                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed {{ qr_dash }}; padding: 12px; border-radius: 12px; text-align: center; margin: 10px 0;">
-                            <img class="qr-code-img" data-slug="{{ r.slug }}" alt="{{ r.name }} QR Kodu" width="150" height="150"
-                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 4px; background: white; display: inline-block;">
-                            <p class="theme-caption" style="font-size: 0.72rem; color: {{ title_col }}; margin-top: 6px; font-weight: 700; margin-bottom: 0;">Sipariş Vermek İçin Okutun</p>
+                        <div class="theme-qr-box" style="background: #ffffff; border: 1px dashed {{ qr_dash }}; padding: 10px; border-radius: 12px; text-align: center; margin: 8px 0; cursor: pointer;" onclick="window.open('/{{ r.slug }}', '_blank')" title="Oda sipariş sayfasını aç (Tıklayın)">
+                            <img class="qr-code-img" data-slug="{{ r.slug }}" alt="{{ r.name }} QR Kodu" width="130" height="130"
+                                style="border-radius: 8px; border: 1px solid #e2e8f0; padding: 3px; background: white; display: inline-block;">
+                            <p class="theme-caption" style="font-size: 0.72rem; color: {{ title_col }}; margin-top: 4px; font-weight: 700; margin-bottom: 0;">Sipariş Vermek İçin Okutun</p>
                         </div>
 
                         <!-- DÜZENLE KISMI (SADECE EKRANDA GÖRÜNÜR, ÇIKTIDA KESİNLİKLE GÖRÜNMEZ) -->
-                        <div class="room-edit-box" style="margin-top: 10px; border-top: 1px dashed rgba(0,0,0,0.12); padding-top: 8px;">
+                        <div class="room-edit-box" onclick="event.stopPropagation()" style="margin-top: 8px; border-top: 1px dashed rgba(0,0,0,0.12); padding-top: 6px;">
                             <details>
                                 <summary style="font-size: 0.76rem; font-weight: 700; color: #475569; cursor: pointer; user-select: none; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 5px 8px; background: rgba(0,0,0,0.04); border-radius: 6px;">
                                     <span>⚙️ Odayı Düzenle / Ayarlar</span>
