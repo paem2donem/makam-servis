@@ -36,7 +36,7 @@ class OrderNotificationService : Service() {
     companion object {
         const val TAG = "OrderNotifService"
         const val FOREGROUND_CHANNEL_ID = "makam_fg_channel"
-        const val ORDER_CHANNEL_ID = "makam_order_channel_chime_v5"
+        const val ORDER_CHANNEL_ID = "makam_orders_channel_v6"
         const val FOREGROUND_NOTIF_ID = 1001
 
         const val ACTION_START = "ACTION_START"
@@ -79,6 +79,8 @@ class OrderNotificationService : Service() {
 
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(10, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     private val httpClient = OkHttpClient.Builder()
@@ -92,6 +94,7 @@ class OrderNotificationService : Service() {
     private val seenOrderIds = Collections.synchronizedSet(mutableSetOf<Int>())
     private var scheduler: ScheduledExecutorService? = null
     private var isConnected = false
+    private var serviceWakeLock: PowerManager.WakeLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -103,6 +106,16 @@ class OrderNotificationService : Service() {
             stopSelf()
             return
         }
+
+        // Arka planda CPU ve ağın uyumasını önlemek için Partial WakeLock tut
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            serviceWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "makamservis:bg_service_wakelock")
+            serviceWakeLock?.acquire()
+        } catch (e: Exception) {
+            Log.e(TAG, "serviceWakeLock acquire error", e)
+        }
+
         createNotificationChannels()
         currentFloor = prefs.getString(PREF_FLOOR, "makam") ?: "makam"
         isMuted = prefs.getBoolean(PREF_IS_MUTED, false)
@@ -136,6 +149,7 @@ class OrderNotificationService : Service() {
             ACTION_CHANGE_FLOOR -> {
                 val newFloor = intent.getStringExtra(EXTRA_FLOOR) ?: "makam"
                 currentFloor = newFloor
+                seenOrderIds.clear()
                 getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
                     .putString(PREF_FLOOR, newFloor)
                     .apply()
@@ -439,16 +453,16 @@ class OrderNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
         val notif = NotificationCompat.Builder(this, ORDER_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("🛎️ YENİ SİPARİŞ: $roomName")
             .setContentText(itemsSummary)
             .setStyle(NotificationCompat.BigTextStyle().bigText("Oda: $roomName\nSiparişler: $itemsSummary"))
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
@@ -529,8 +543,39 @@ class OrderNotificationService : Service() {
         manager.notify(FOREGROUND_NOTIF_ID, createForegroundNotification(text))
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.d(TAG, "onTaskRemoved: Ensuring background notification service remains active")
+        try {
+            val restartIntent = Intent(applicationContext, OrderNotificationService::class.java).apply {
+                setPackage(packageName)
+                action = ACTION_START
+            }
+            val pendingIntent = PendingIntent.getService(
+                applicationContext,
+                1001,
+                restartIntent,
+                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
+            )
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
+            alarmManager?.set(
+                android.app.AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                android.os.SystemClock.elapsedRealtime() + 1000,
+                pendingIntent
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onTaskRemoved", e)
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            if (serviceWakeLock?.isHeld == true) {
+                serviceWakeLock?.release()
+            }
+        } catch (_: Exception) {}
+        serviceWakeLock = null
         try {
             webSocket?.close(1000, "Service destroyed")
         } catch (_: Exception) {}

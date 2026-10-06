@@ -123,6 +123,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         checkNotificationPermission()
+        checkBatteryOptimization()
         loadPreferences()
         fetchRoomsList()
 
@@ -544,6 +545,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun checkBatteryOptimization() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                        data = android.net.Uri.parse("package:$packageName")
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Battery optimization intent error", e)
+                }
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         startForegroundOrderChecker()
@@ -624,7 +641,7 @@ fun AppScreen(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-                                    color = if (isMuted) Color(0xFFEF4444) else if (isConnected) Color(0xFF10B981) else Color(0xFFF59E0B)
+                                    color = if (isConnected) Color(0xFF10B981) else Color(0xFFF59E0B)
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -638,7 +655,7 @@ fun AppScreen(
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
                                         Text(
-                                            text = if (isMuted) "Ses Kapalı" else if (isConnected) "Canlı" else "Bağlanıyor",
+                                            text = if (isConnected) "Canlı" else "Bağlanıyor",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White
@@ -649,13 +666,13 @@ fun AppScreen(
                         }
                         Text(
                             text = when (role) {
-                                OrderNotificationService.ROLE_KITCHEN -> if (isMuted) "🔇 Sesli uyarı kapalı - telefon sessizde" else "🔊 Sesli uyarı açık - kat siparişleri çalar"
+                                OrderNotificationService.ROLE_KITCHEN -> "Kat siparişleri takip ediliyor"
                                 OrderNotificationService.ROLE_ROOM -> "Sipariş verme ekranı"
                                 OrderNotificationService.ROLE_ADMIN -> "Sistem yönetim ekranı"
                                 else -> ""
                             },
                             fontSize = 11.sp,
-                            color = if (role == OrderNotificationService.ROLE_KITCHEN && isMuted) Color(0xFFFCA5A5) else Color(0xFF94A3B8)
+                            color = Color(0xFF94A3B8)
                         )
                     }
                 },
@@ -679,7 +696,7 @@ fun AppScreen(
                         }
                     }
 
-                    // Sesli Uyarı Açık / Kapalı Toggle Button for Kitchen
+                    // Tek ve Net Sesli Uyarı Butonu (Açık / Kapalı)
                     if (role == OrderNotificationService.ROLE_KITCHEN) {
                         Surface(
                             modifier = Modifier
@@ -744,52 +761,6 @@ fun AppScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Sesli Uyarı Kapalı Uyarı Bandı
-            if (role == OrderNotificationService.ROLE_KITCHEN && isMuted) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onToggleMute() },
-                    color = Color(0xFFFEF2F2)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "🔇", fontSize = 16.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    text = "Sesli Uyarı Kapalı",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = Color(0xFF991B1B)
-                                )
-                                Text(
-                                    text = "Yeni siparişlerde telefon sesli çalmaz.",
-                                    fontSize = 10.5.sp,
-                                    color = Color(0xFFB91C1C)
-                                )
-                            }
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFFDC2626)
-                        ) {
-                            Text(
-                                text = "Aç ▶",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
             Box(
                 modifier = Modifier
                     .fillMaxSize()

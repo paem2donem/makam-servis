@@ -25,9 +25,6 @@
                 <div class="stat-pill count-pill">
                     <span id="kitchenOrderCount">0</span> Bekleyen Sipariş
                 </div>
-                <button type="button" id="btnMuteToggle" onclick="toggleKitchenMute()" class="stat-pill" style="border: none; cursor: pointer; background: #16a34a; color: white; font-weight: bold; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 20px;">
-                    🔊 Sesli Uyarı: Açık
-                </button>
                 <a href="/mutfak" class="stat-pill" style="text-decoration: none; color: inherit; font-size: 0.8rem; background: rgba(255,255,255,0.2);">
                     🔄 Kat Değiştir
                 </a>
@@ -42,9 +39,6 @@
 
         <div class="kitchen-toolbar">
             <span class="toolbar-title">📥 {{ floor_name }} Siparişleri</span>
-            <div id="soundBadge" class="sound-always-on-badge">
-                🔊 Sesli Uyarı Açık
-            </div>
         </div>
 
         <div id="ordersContainer" class="orders-grid">
