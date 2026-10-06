@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Depends, Form, File, UploadFile, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text, func
@@ -12,7 +12,7 @@ import datetime
 import socket
 import re
 
-RESERVED_SLUGS = {"admin", "mutfak", "api", "static", "uploads", "login", "logout", "docs", "redoc", "openapi.json", "favicon.ico"}
+RESERVED_SLUGS = {"admin", "mutfak", "api", "static", "uploads", "login", "logout", "docs", "redoc", "openapi.json", "favicon.ico", "indir", "app"}
 
 def normalize_slug(slug_str: str) -> str:
     if not slug_str:
@@ -243,6 +243,14 @@ async def logout():
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie(key="admin_session")
     return response
+
+@app.get("/indir")
+@app.get("/app")
+async def download_apk():
+    apk_path = "static/makam-servis.apk"
+    if os.path.exists(apk_path):
+        return FileResponse(apk_path, media_type="application/vnd.android.package-archive", filename="MakamServis.apk")
+    raise HTTPException(status_code=404, detail="Uygulama paketi henüz hazırlanmadı")
 
 @app.get("/mutfak", response_class=HTMLResponse)
 async def kitchen_selector(request: Request):
