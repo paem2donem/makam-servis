@@ -307,7 +307,7 @@ async def show_room_page(request: Request, room_slug: str, db: Session = Depends
     room_obj = db.query(models.Room).filter(func.lower(models.Room.slug) == room_slug.lower()).first()
     if not room_obj:
         rooms = db.query(models.Room).all()
-        return templates.TemplateResponse(request=request, name="select_room.html", context={"rooms": rooms, "error": "Geçersiz oda!"})
+        return templates.TemplateResponse(request=request, name="select_room.html", context={"rooms": rooms, "floors": FLOORS, "error": "Geçersiz oda!"})
         
     products = db.query(models.Product).filter(models.Product.is_available == True).order_by(models.Product.display_order.asc(), models.Product.id.asc()).all()
     food_products = [p for p in products if p.category == "yemek"]
