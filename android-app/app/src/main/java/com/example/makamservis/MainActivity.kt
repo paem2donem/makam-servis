@@ -72,7 +72,7 @@ class MainActivity : ComponentActivity() {
     private var webViewRef: WebView? = null
     private var isConnectedState = mutableStateOf(false)
     private var isMutedState = mutableStateOf(false)
-    private var selectedRoleState = mutableStateOf(OrderNotificationService.ROLE_KITCHEN)
+    private var selectedRoleState = mutableStateOf(OrderNotificationService.ROLE_ROOM)
     private var selectedFloorState = mutableStateOf("makam")
     private var selectedRoomSlugState = mutableStateOf("")
     private var selectedRoomNameState = mutableStateOf("")
@@ -88,6 +88,10 @@ class MainActivity : ComponentActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 OrderNotificationService.BROADCAST_NEW_ORDER -> {
+                    // Sipariş verenler için hiçbir bildirim/uyarı düşmesin!
+                    if (selectedRoleState.value != OrderNotificationService.ROLE_KITCHEN) {
+                        return
+                    }
                     val room = intent.getStringExtra("room_name") ?: "Yeni Sipariş"
                     val items = intent.getStringExtra("items_summary") ?: ""
                     val isMuted = intent.getBooleanExtra("is_muted", false)
@@ -232,7 +236,7 @@ class MainActivity : ComponentActivity() {
     private fun loadPreferences() {
         val prefs = getSharedPreferences(OrderNotificationService.PREFS_NAME, Context.MODE_PRIVATE)
         val isConfigured = prefs.getBoolean(OrderNotificationService.PREF_CONFIGURED, false)
-        selectedRoleState.value = prefs.getString(OrderNotificationService.PREF_ROLE, OrderNotificationService.ROLE_KITCHEN) ?: OrderNotificationService.ROLE_KITCHEN
+        selectedRoleState.value = prefs.getString(OrderNotificationService.PREF_ROLE, OrderNotificationService.ROLE_ROOM) ?: OrderNotificationService.ROLE_ROOM
         selectedFloorState.value = prefs.getString(OrderNotificationService.PREF_FLOOR, "makam") ?: "makam"
         selectedRoomSlugState.value = prefs.getString(OrderNotificationService.PREF_ROOM_SLUG, "") ?: ""
         selectedRoomNameState.value = prefs.getString(OrderNotificationService.PREF_ROOM_NAME, "") ?: ""
@@ -288,12 +292,29 @@ class MainActivity : ComponentActivity() {
                         .apply()
                     syncServiceWithRole()
                 }
+            } else if (path == "mutfak") {
+                // Mutfak seçim ekranı
             } else if (path == "admin") {
                 if (selectedRoleState.value != OrderNotificationService.ROLE_ADMIN) {
                     selectedRoleState.value = OrderNotificationService.ROLE_ADMIN
                     val prefs = getSharedPreferences(OrderNotificationService.PREFS_NAME, Context.MODE_PRIVATE)
                     prefs.edit()
                         .putString(OrderNotificationService.PREF_ROLE, OrderNotificationService.ROLE_ADMIN)
+                        .putBoolean(OrderNotificationService.PREF_CONFIGURED, true)
+                        .apply()
+                    syncServiceWithRole()
+                }
+            } else if (path.isNotEmpty() && !path.startsWith("static") && !path.startsWith("api") && !path.startsWith("indir") && !path.startsWith("app")) {
+                // Oda / Sipariş verme ekranı: Arka plan servisini ve bildirimleri tamamen devre dışı bırak!
+                if (selectedRoleState.value != OrderNotificationService.ROLE_ROOM || selectedRoomSlugState.value != path) {
+                    Log.d("MainActivity", "User is viewing room $path -> Switching to ROLE_ROOM (NO NOTIFICATIONS)")
+                    selectedRoleState.value = OrderNotificationService.ROLE_ROOM
+                    selectedRoomSlugState.value = path
+                    selectedRoomNameState.value = path
+                    val prefs = getSharedPreferences(OrderNotificationService.PREFS_NAME, Context.MODE_PRIVATE)
+                    prefs.edit()
+                        .putString(OrderNotificationService.PREF_ROLE, OrderNotificationService.ROLE_ROOM)
+                        .putString(OrderNotificationService.PREF_ROOM_SLUG, path)
                         .putBoolean(OrderNotificationService.PREF_CONFIGURED, true)
                         .apply()
                     syncServiceWithRole()
@@ -398,7 +419,10 @@ class MainActivity : ComponentActivity() {
             val intent = Intent(this, OrderNotificationService::class.java).apply {
                 action = OrderNotificationService.ACTION_STOP
             }
-            startService(intent)
+            try {
+                startService(intent)
+                stopService(intent)
+            } catch (_: Exception) {}
         }
     }
 
@@ -638,7 +662,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        startForegroundOrderChecker()
+        if (selectedRoleState.value == OrderNotificationService.ROLE_KITCHEN) {
+            startForegroundOrderChecker()
+        }
     }
 
     override fun onPause() {

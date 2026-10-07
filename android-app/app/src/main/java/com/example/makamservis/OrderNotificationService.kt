@@ -35,7 +35,7 @@ class OrderNotificationService : Service() {
 
     companion object {
         const val TAG = "OrderNotifService"
-        const val FOREGROUND_CHANNEL_ID = "makam_fg_channel"
+        const val FOREGROUND_CHANNEL_ID = "makam_fg_silent_v2"
         const val ORDER_CHANNEL_ID = "makam_orders_channel_v6"
         const val FOREGROUND_NOTIF_ID = 1001
 
@@ -101,8 +101,9 @@ class OrderNotificationService : Service() {
     override fun onCreate() {
         super.onCreate()
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val role = prefs.getString(PREF_ROLE, ROLE_KITCHEN) ?: ROLE_KITCHEN
+        val role = prefs.getString(PREF_ROLE, ROLE_ROOM) ?: ROLE_ROOM
         if (role != ROLE_KITCHEN) {
+            Log.d(TAG, "Not kitchen role ($role). Stopping service immediately.")
             stopSelf()
             return
         }
@@ -120,8 +121,7 @@ class OrderNotificationService : Service() {
         currentFloor = prefs.getString(PREF_FLOOR, "makam") ?: "makam"
         isMuted = prefs.getBoolean(PREF_IS_MUTED, false)
         
-        val initialStatus = if (isMuted) "🔇 Sesli Uyarı Kapalı" else "Mutfak Takibi Başlatılıyor..."
-        safeStartForeground(createForegroundNotification(initialStatus))
+        safeStartForeground(createForegroundNotification())
         
         Thread {
             snapshotExistingOrders()
@@ -131,20 +131,21 @@ class OrderNotificationService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val currentStatus = if (isMuted) "🔇 Sesli Uyarı Kapalı" else if (isConnected) "🟢 Sesli Uyarı Açık" else "🟡 Bağlantı Kuruluyor..."
-        safeStartForeground(createForegroundNotification(currentStatus))
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val role = prefs.getString(PREF_ROLE, ROLE_ROOM) ?: ROLE_ROOM
+        if (role != ROLE_KITCHEN || intent?.action == ACTION_STOP) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        safeStartForeground(createForegroundNotification())
 
         when (intent?.action) {
-            ACTION_STOP -> {
-                stopSelf()
-                return START_NOT_STICKY
-            }
             ACTION_TOGGLE_MUTE -> {
                 isMuted = intent.getBooleanExtra(EXTRA_MUTED, false)
                 getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
                     .putBoolean(PREF_IS_MUTED, isMuted)
                     .apply()
-                updateForegroundNotification()
             }
             ACTION_CHANGE_FLOOR -> {
                 val newFloor = intent.getStringExtra(EXTRA_FLOOR) ?: "makam"
@@ -158,6 +159,7 @@ class OrderNotificationService : Service() {
                     Thread {
                         snapshotExistingOrdersQuietly()
                     }.start()
+                    updateForegroundNotification()
                 }
                 restartConnection()
             }
@@ -245,7 +247,6 @@ class OrderNotificationService : Service() {
             oldWs?.cancel()
         } catch (_: Exception) {}
         connectWebSocket()
-        updateForegroundNotification()
     }
 
     private fun connectWebSocket() {
@@ -263,7 +264,6 @@ class OrderNotificationService : Service() {
                 Log.d(TAG, "WebSocket Connected to $url")
                 isConnected = true
                 broadcastStatus(true)
-                updateForegroundNotification()
             }
 
             override fun onMessage(ws: WebSocket, text: String) {
@@ -285,7 +285,6 @@ class OrderNotificationService : Service() {
                 Log.e(TAG, "WebSocket Failure: ${t.message}")
                 isConnected = false
                 broadcastStatus(false)
-                updateForegroundNotification()
                 // Reconnect after 3 seconds
                 scheduler?.schedule({
                     connectWebSocket()
@@ -508,18 +507,21 @@ class OrderNotificationService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-            // Foreground persistent channel
+            // Foreground persistent silent channel (NO sound, NO vibration, MIN importance)
             val fgChannel = NotificationChannel(
                 FOREGROUND_CHANNEL_ID,
-                "Makam Servis Durumu",
-                NotificationManager.IMPORTANCE_LOW
+                "Makam Servis Mutfak Takibi",
+                NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Uygulamanın arka planda canlı kaldığını gösterir"
+                description = "Mutfak personeli için arka plan bağlantı servisi"
                 setShowBadge(false)
+                enableLights(false)
+                enableVibration(false)
+                setSound(null, null)
             }
             manager.createNotificationChannel(fgChannel)
 
-            // High priority Order channel
+            // High priority Order channel (ONLY FOR INCOMING ORDERS!)
             val orderChannel = NotificationChannel(
                 ORDER_CHANNEL_ID,
                 "Yeni İkram Siparişleri",
@@ -542,7 +544,7 @@ class OrderNotificationService : Service() {
         }
     }
 
-    private fun createForegroundNotification(statusText: String): android.app.Notification {
+    private fun createForegroundNotification(): android.app.Notification {
         val intent = Intent(this, MainActivity::class.java)
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,
@@ -550,32 +552,32 @@ class OrderNotificationService : Service() {
         )
 
         val floorLabel = getFloorLabel(currentFloor)
-        val displayText = if (isMuted) {
-            "🔇 $floorLabel (Sesli Uyarı Kapalı)"
-        } else if (isConnected) {
-            "🟢 $floorLabel (Sesli Uyarı Açık)"
-        } else {
-            "🟡 $floorLabel ($statusText)"
-        }
-
         return NotificationCompat.Builder(this, FOREGROUND_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Makam Servis Mutfak")
-            .setContentText(displayText)
+            .setContentTitle("Makam Servis")
+            .setContentText("$floorLabel sipariş takibi aktif")
             .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
     }
 
     private fun updateForegroundNotification() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val text = if (isMuted) "Sesli Uyarı Kapalı" else if (isConnected) "Sesli Uyarı Açık" else "Bağlanıyor"
-        manager.notify(FOREGROUND_NOTIF_ID, createForegroundNotification(text))
+        manager.notify(FOREGROUND_NOTIF_ID, createForegroundNotification())
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
+        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val role = prefs.getString(PREF_ROLE, ROLE_ROOM) ?: ROLE_ROOM
+        if (role != ROLE_KITCHEN) {
+            // SİPARİŞ VERENLER VEYA ODA KULLANICILARI İÇİN SERVİS ASLA YENİDEN BAŞLATILMAZ!
+            return
+        }
         Log.d(TAG, "onTaskRemoved: Ensuring background notification service remains active")
         try {
             val restartIntent = Intent(applicationContext, OrderNotificationService::class.java).apply {
