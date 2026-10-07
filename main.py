@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text, func
 from sqlalchemy.orm import Session
-from database import engine, Base, get_db
+from database import engine, Base, get_db, SessionLocal
 import models
 import os
 import shutil
@@ -210,8 +210,11 @@ def init_db(db: Session):
 
 @app.on_event("startup")
 def startup_event():
-    db = next(get_db())
-    init_db(db)
+    db = SessionLocal()
+    try:
+        init_db(db)
+    finally:
+        db.close()
 
 # ==============================================================================
 # PAGES & ROUTES (Fixed system routes MUST be defined before wildcards!)

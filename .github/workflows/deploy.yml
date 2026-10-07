@@ -21,5 +21,26 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/makam-servis
+            echo "=== SYSTEM STATS ==="
+            uptime
+            free -m
+            df -h
+            echo "=== DOCKER CONTAINERS BEFORE ==="
+            sudo docker ps -a
+            echo "=== GIT PULL ==="
             git pull origin main
-            sudo docker compose up -d --build
+            echo "=== CLEANUP UNUSED DOCKER IMAGES ==="
+            sudo docker image prune -f
+            echo "=== RESTART CONTAINERS ==="
+            sudo docker compose down
+            sudo docker compose up -d --build --force-recreate
+            sleep 6
+            echo "=== DOCKER CONTAINERS AFTER ==="
+            sudo docker ps
+            echo "=== ENSURE FIREWALL PORTS ==="
+            sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 8000 -j ACCEPT || true
+            sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT || true
+            echo "=== TEST FASTAPI PORT 8000 ==="
+            curl -sv http://127.0.0.1:8000/ || true
+            echo "=== TEST CADDY PORT 80 ==="
+            curl -sv http://127.0.0.1:80/ || true
