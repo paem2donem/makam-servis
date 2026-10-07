@@ -255,7 +255,7 @@ async def download_apk():
         return FileResponse(
             apk_path, 
             media_type="application/vnd.android.package-archive", 
-            filename="MakamServis-v1.1.1.apk",
+            filename="MakamServis-v1.1.2.apk",
             headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
         )
     raise HTTPException(status_code=404, detail="Uygulama paketi henüz hazırlanmadı")

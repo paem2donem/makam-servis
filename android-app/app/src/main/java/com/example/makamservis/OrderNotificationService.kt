@@ -35,8 +35,8 @@ class OrderNotificationService : Service() {
 
     companion object {
         const val TAG = "OrderNotifService"
-        const val FOREGROUND_CHANNEL_ID = "makam_fg_silent_v2"
-        const val ORDER_CHANNEL_ID = "makam_orders_channel_v6"
+        const val FOREGROUND_CHANNEL_ID = "makam_fg_service_v3"
+        const val ORDER_CHANNEL_ID = "makam_orders_channel_v7"
         const val FOREGROUND_NOTIF_ID = 1001
 
         const val ACTION_START = "ACTION_START"
@@ -124,7 +124,7 @@ class OrderNotificationService : Service() {
         safeStartForeground(createForegroundNotification())
         
         Thread {
-            snapshotExistingOrders()
+            snapshotExistingOrdersQuietly()
         }.start()
 
         startPollingAndWebSocket()
@@ -136,6 +136,17 @@ class OrderNotificationService : Service() {
         if (role != ROLE_KITCHEN || intent?.action == ACTION_STOP) {
             stopSelf()
             return START_NOT_STICKY
+        }
+
+        // Arka planda CPU ve ağın uyumasını önlemek için WakeLock'ın aktifliğini teyit et
+        if (serviceWakeLock == null || serviceWakeLock?.isHeld != true) {
+            try {
+                val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                serviceWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "makamservis:bg_service_wakelock")
+                serviceWakeLock?.acquire()
+            } catch (e: Exception) {
+                Log.e(TAG, "serviceWakeLock acquire error in onStartCommand", e)
+            }
         }
 
         safeStartForeground(createForegroundNotification())
@@ -507,13 +518,13 @@ class OrderNotificationService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-            // Foreground persistent silent channel (NO sound, NO vibration, MIN importance)
+            // Foreground persistent silent channel (IMPORTANCE_LOW keeps service and sockets alive 24/7 without popups/sounds)
             val fgChannel = NotificationChannel(
                 FOREGROUND_CHANNEL_ID,
                 "Makam Servis Mutfak Takibi",
-                NotificationManager.IMPORTANCE_MIN
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Mutfak personeli için arka plan bağlantı servisi"
+                description = "Mutfak personeli için kesintisiz arka plan sipariş dinleme servisi"
                 setShowBadge(false)
                 enableLights(false)
                 enableVibration(false)
@@ -545,7 +556,9 @@ class OrderNotificationService : Service() {
     }
 
     private fun createForegroundNotification(): android.app.Notification {
-        val intent = Intent(this, MainActivity::class.java)
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
         val pendingIntent = PendingIntent.getActivity(
             this, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -560,7 +573,7 @@ class OrderNotificationService : Service() {
             .setOngoing(true)
             .setSilent(true)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .build()
     }

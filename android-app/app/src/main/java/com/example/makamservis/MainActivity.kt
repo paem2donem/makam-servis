@@ -278,10 +278,29 @@ class MainActivity : ComponentActivity() {
         try {
             val uri = android.net.Uri.parse(url)
             val path = uri.path?.removePrefix("/") ?: ""
+
+            // Mutfak personeli rolündeyse, ASLA web sayfası gezintisiyle rolünü oda yapma!
+            if (selectedRoleState.value == OrderNotificationService.ROLE_KITCHEN) {
+                if (path.startsWith("mutfak/")) {
+                    val floorKey = path.removePrefix("mutfak/").trimEnd('/')
+                    if (floorKey.isNotBlank() && selectedFloorState.value != floorKey) {
+                        Log.d("MainActivity", "Updating kitchen floor from WebView URL: $floorKey")
+                        selectedFloorState.value = floorKey
+                        val prefs = getSharedPreferences(OrderNotificationService.PREFS_NAME, Context.MODE_PRIVATE)
+                        prefs.edit()
+                            .putString(OrderNotificationService.PREF_FLOOR, floorKey)
+                            .apply()
+                        syncServiceWithRole()
+                    }
+                }
+                return
+            }
+
+            // Mutfak rolünde değilse ve mutfak sayfasına gidilmişse
             if (path.startsWith("mutfak/")) {
                 val floorKey = path.removePrefix("mutfak/").trimEnd('/')
-                if (floorKey.isNotBlank() && (selectedRoleState.value != OrderNotificationService.ROLE_KITCHEN || selectedFloorState.value != floorKey)) {
-                    Log.d("MainActivity", "Auto-syncing floor from WebView URL: $floorKey")
+                if (floorKey.isNotBlank()) {
+                    Log.d("MainActivity", "Auto-syncing kitchen role from WebView URL: $floorKey")
                     selectedRoleState.value = OrderNotificationService.ROLE_KITCHEN
                     selectedFloorState.value = floorKey
                     val prefs = getSharedPreferences(OrderNotificationService.PREFS_NAME, Context.MODE_PRIVATE)
@@ -304,7 +323,7 @@ class MainActivity : ComponentActivity() {
                         .apply()
                     syncServiceWithRole()
                 }
-            } else if (path.isNotEmpty() && !path.startsWith("static") && !path.startsWith("api") && !path.startsWith("indir") && !path.startsWith("app")) {
+            } else if (path.isNotEmpty() && !path.startsWith("static") && !path.startsWith("api") && !path.startsWith("indir") && !path.startsWith("app") && !path.startsWith("favicon") && !path.endsWith(".ico") && !path.endsWith(".png")) {
                 // Oda / Sipariş verme ekranı: Arka plan servisini ve bildirimleri tamamen devre dışı bırak!
                 if (selectedRoleState.value != OrderNotificationService.ROLE_ROOM || selectedRoomSlugState.value != path) {
                     Log.d("MainActivity", "User is viewing room $path -> Switching to ROLE_ROOM (NO NOTIFICATIONS)")
