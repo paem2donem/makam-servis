@@ -35,7 +35,7 @@
             <div class="product-card" data-id="{{ p.id }}" data-name="{{ p.name }}" data-category="icecek">
                 <div class="product-image">
                     {% if p.image_url %}
-                    <img src="{{ p.image_url }}" alt="{{ p.name }}">
+                    <img src="{{ p.image_url }}" alt="{{ p.name }}" loading="lazy">
                     {% else %}
                     <div class="placeholder-img">{{ p.name[:2]|upper }}</div>
                     {% endif %}
@@ -65,7 +65,7 @@
             <div class="product-card" data-id="{{ p.id }}" data-name="{{ p.name }}" data-category="yemek">
                 <div class="product-image">
                     {% if p.image_url %}
-                    <img src="{{ p.image_url }}" alt="{{ p.name }}">
+                    <img src="{{ p.image_url }}" alt="{{ p.name }}" loading="lazy">
                     {% else %}
                     <div class="placeholder-img">{{ p.name[:2]|upper }}</div>
                     {% endif %}
